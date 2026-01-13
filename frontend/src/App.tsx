@@ -3,9 +3,20 @@ import { Settings, FolderOpen, RefreshCw, Gamepad2, ChevronDown, Edit3 } from 'l
 import { motion } from 'framer-motion';
 import BackgroundImage from './components/BackgroundImage';
 import Titlebar from './components/Titlebar';
+import { DownloadGame } from '../wailsjs/go/main/App';
 
 const App: React.FC = () => {
   const [downloadProgress] = useState(42);
+
+  const handlePlay = async () => {
+    try {
+      await DownloadGame();
+      console.log("Download started");
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
 
   return (
     <div className="relative w-[1280px] h-[720px] bg-[#090909] text-white overflow-hidden font-sans select-none shadow-2xl rounded-[14px] border border-white/5">
@@ -70,6 +81,7 @@ const App: React.FC = () => {
                 whileHover={{ scale: 1.01, backgroundColor: 'rgba(9, 9, 9, 0.7)', borderColor: 'rgba(255, 168, 69, 0.4)' }}
                 whileTap={{ scale: 0.99 }}
                 className="w-[294px] h-[94px] bg-[#090909]/[0.55] backdrop-blur-xl text-white font-black text-4xl tracking-tighter rounded-[14px] border border-[#FFA845]/[0.10] shadow-lg transition-all cursor-pointer"
+                onClick={handlePlay}
               >
                 PLAY
               </motion.button>

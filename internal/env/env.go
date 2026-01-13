@@ -44,11 +44,13 @@ func GetDefaultAppDir() string {
 	}
 }
 
-func CreateFolders(basePath string) error {
+func CreateFolders() error {
+	basePath := GetDefaultAppDir()
 	packagePath := filepath.Join(basePath, "release", "package") // Package folder
 
 	paths := []string{
-		basePath,                       // main folder
+		basePath,                          // main folder
+		filepath.Join(basePath, "cache"),  // cache Folder
 		filepath.Join(packagePath, "jre"), // JRE Folder
 		filepath.Join(packagePath, "game"),
 		filepath.Join(packagePath, "game", "latest"),

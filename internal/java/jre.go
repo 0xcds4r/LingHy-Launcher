@@ -49,9 +49,6 @@ func DownloadJRE() error {
 	arch := env.GetArch()
 
 	basePath := env.GetDefaultAppDir()
-	if err := env.CreateFolders(basePath); err != nil {
-		return err
-	}
 
 	cacheDir := filepath.Join(basePath, "cache")
 	jreLatest := filepath.Join(basePath, "release", "package", "jre", "latest")
@@ -126,6 +123,12 @@ func DownloadJRE() error {
 	if osName != "windows" {
 		java := filepath.Join(jreLatest, "bin", "java")
 		_ = os.Chmod(java, 0755)
+	}
+
+	flattenJREDir(jreLatest)
+
+	if err := os.Remove(cacheFile); err != nil {
+		fmt.Println("Warning: failed to remove cached JRE:", err)
 	}
 
 	fmt.Println("JRE installed successfully")

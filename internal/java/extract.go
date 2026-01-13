@@ -135,3 +135,33 @@ func extractTarGz(tarGzPath, dest string) error {
 	}
 	return nil
 }
+
+func flattenJREDir(jreLatest string) error {
+	entries, err := os.ReadDir(jreLatest)
+	if err != nil {
+		return err
+	}
+
+	// Only flatten if there's exactly one directory
+	if len(entries) != 1 || !entries[0].IsDir() {
+		return nil
+	}
+
+	nested := filepath.Join(jreLatest, entries[0].Name())
+
+	files, err := os.ReadDir(nested)
+	if err != nil {
+		return err
+	}
+
+	for _, f := range files {
+		oldPath := filepath.Join(nested, f.Name())
+		newPath := filepath.Join(jreLatest, f.Name())
+
+		if err := os.Rename(oldPath, newPath); err != nil {
+			return err
+		}
+	}
+
+	return os.RemoveAll(nested)
+}

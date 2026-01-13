@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 
+	"HyLauncher/internal/env"
 	"HyLauncher/internal/java"
 )
 
@@ -21,6 +22,7 @@ func NewApp() *App {
 // so we can call the runtime methods
 func (a *App) startup(ctx context.Context) {
 	a.ctx = ctx
+	env.CreateFolders()
 }
 
 func (a *App) DownloadGame() error {
