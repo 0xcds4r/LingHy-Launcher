@@ -15,12 +15,17 @@ import (
 func InstallButler(ctx context.Context, progressCallback func(stage string, progress float64, message string, currentFile string, speed string, downloaded, total int64)) (string, error) {
 	toolsDir := filepath.Join(env.GetDefaultAppDir(), "tools", "butler")
 	zipPath := filepath.Join(toolsDir, "butler.zip")
+	tempZipPath := zipPath + ".tmp"
+
 	var butlerPath string
 	if runtime.GOOS == "windows" {
 		butlerPath = filepath.Join(toolsDir, "butler.exe")
 	} else {
 		butlerPath = filepath.Join(toolsDir, "butler")
 	}
+
+	// Remove any incomplete temp file from previous session
+	_ = os.Remove(tempZipPath)
 
 	// If binary already exists, skip
 	if _, err := os.Stat(butlerPath); err == nil {
@@ -48,7 +53,14 @@ func InstallButler(ctx context.Context, progressCallback func(stage string, prog
 		progressCallback("butler", 0, "Downloading Butler...", "butler.zip", "", 0, 0)
 	}
 
-	if err := downloadFile(zipPath, url, progressCallback); err != nil {
+	if err := downloadFile(tempZipPath, url, progressCallback); err != nil {
+		_ = os.Remove(tempZipPath)
+		return "", err
+	}
+
+	// Move temp file to final destination
+	if err := os.Rename(tempZipPath, zipPath); err != nil {
+		_ = os.Remove(tempZipPath)
 		return "", err
 	}
 

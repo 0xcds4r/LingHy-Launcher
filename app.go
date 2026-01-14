@@ -43,6 +43,12 @@ func NewApp() *App {
 func (a *App) startup(ctx context.Context) {
 	a.ctx = ctx
 	env.CreateFolders()
+
+	// Clean up any incomplete downloads from previous sessions
+	fmt.Println("Checking for incomplete downloads...")
+	if err := env.CleanupIncompleteDownloads(); err != nil {
+		fmt.Println("Warning: cleanup failed:", err)
+	}
 }
 
 func (a *App) emitProgress(update ProgressUpdate) {

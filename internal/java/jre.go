@@ -99,6 +99,10 @@ func DownloadJRE(ctx context.Context, progressCallback func(stage string, progre
 
 	fileName := filepath.Base(platform.URL)
 	cacheFile := filepath.Join(cacheDir, fileName)
+	tempCacheFile := cacheFile + ".tmp"
+
+	// Remove any incomplete temp file from previous session
+	_ = os.Remove(tempCacheFile)
 
 	if _, err := os.Stat(cacheFile); os.IsNotExist(err) {
 		fmt.Println("Downloading JRE...")
@@ -112,11 +116,10 @@ func DownloadJRE(ctx context.Context, progressCallback func(stage string, progre
 		}
 		defer resp2.Body.Close()
 
-		out, err := os.Create(cacheFile)
+		out, err := os.Create(tempCacheFile)
 		if err != nil {
 			return err
 		}
-		defer out.Close()
 
 		pr := &progressReader{
 			reader:    resp2.Body,
@@ -126,7 +129,17 @@ func DownloadJRE(ctx context.Context, progressCallback func(stage string, progre
 			startTime: time.Now(),
 		}
 
-		if _, err := io.Copy(out, pr); err != nil {
+		_, copyErr := io.Copy(out, pr)
+		out.Close()
+
+		if copyErr != nil {
+			_ = os.Remove(tempCacheFile)
+			return copyErr
+		}
+
+		// Move temp file to final destination atomically
+		if err := os.Rename(tempCacheFile, cacheFile); err != nil {
+			_ = os.Remove(tempCacheFile)
 			return err
 		}
 
@@ -180,7 +193,6 @@ func GetJavaExec() string {
 
 	// Check if it exists
 	if _, err := os.Stat(javaBin); os.IsNotExist(err) {
-		// If java is missing, just return "java" and hope it's in PATH (fallback)
 		fmt.Println("Warning: JRE not found, fallback to system java")
 		return "java"
 	}

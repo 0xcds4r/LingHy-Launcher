@@ -13,9 +13,7 @@ import (
 	"HyLauncher/internal/env"
 )
 
-type ProgressCallback func(stage string, progress float64, message string, currentFile string, speed string, downloaded, total int64)
-
-func DownloadPWR(ctx context.Context, version, fileName string, progressCallback ProgressCallback) (string, error) {
+func DownloadPWR(ctx context.Context, version, fileName string, progressCallback func(stage string, progress float64, message string, currentFile string, speed string, downloaded, total int64)) (string, error) {
 	cacheDir := filepath.Join(env.GetDefaultAppDir(), "cache")
 	if err := os.MkdirAll(cacheDir, 0755); err != nil {
 		return "", err
@@ -28,8 +26,12 @@ func DownloadPWR(ctx context.Context, version, fileName string, progressCallback
 		osName, arch, version, fileName)
 
 	dest := filepath.Join(cacheDir, fileName)
+	tempDest := dest + ".tmp"
 
-	// Skip if already downloaded
+	// Remove any incomplete temp file from previous session
+	_ = os.Remove(tempDest)
+
+	// Skip if already downloaded and complete
 	if _, err := os.Stat(dest); err == nil {
 		fmt.Println("PWR file already exists:", dest)
 		if progressCallback != nil {
@@ -39,7 +41,14 @@ func DownloadPWR(ctx context.Context, version, fileName string, progressCallback
 	}
 
 	fmt.Println("Downloading PWR file:", url)
-	if err := downloadFile(dest, url, progressCallback); err != nil {
+	if err := downloadFile(tempDest, url, progressCallback); err != nil {
+		_ = os.Remove(tempDest)
+		return "", err
+	}
+
+	// Move temp file to final destination atomically
+	if err := os.Rename(tempDest, dest); err != nil {
+		_ = os.Remove(tempDest)
 		return "", err
 	}
 
@@ -48,7 +57,7 @@ func DownloadPWR(ctx context.Context, version, fileName string, progressCallback
 }
 
 // downloadFile with progress reporting
-func downloadFile(dest, url string, progressCallback ProgressCallback) error {
+func downloadFile(dest, url string, progressCallback func(stage string, progress float64, message string, currentFile string, speed string, downloaded, total int64)) error {
 	resp, err := http.Get(url)
 	if err != nil {
 		return err
