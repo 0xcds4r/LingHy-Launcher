@@ -12,6 +12,7 @@
 
 - Golang 1.23+
 - NodeJS 24+
+
 Так же [Wails CLI](https://wails.io/docs/gettingstarted/installation#platform-specific-dependencies)
 
 Чтобы забилдить пишем:
@@ -25,9 +26,9 @@ buils/bin/
 ```
 
 # Связь
-[Discord](dsc.gg/hylauncher)
-[Telegram](t.me/hylauncher)
+[Discord](https://dsc.gg/hylauncher)
+[Telegram](https://t.me/hylauncher)
 
 # Авторы
-[ArchDev aka nullxweb](github.com/ArchDevs)
-[ronitmb](github.com/ronitmb)
+[ArchDev aka nullxweb](https://github.com/ArchDevs)
+[ronitmb](https://github.com/ronitmb)
