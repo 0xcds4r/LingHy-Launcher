@@ -10,41 +10,6 @@ import (
 	"path/filepath"
 )
 
-func InstallGame(ctx context.Context, version, fileName string, progressCallback func(stage string, progress float64, message string, currentFile string, speed string, downloaded, total int64)) error {
-	gameLatest := filepath.Join(env.GetDefaultAppDir(), "release", "package", "game", "latest")
-
-	// Check if Hytale client already exists
-	gameClient := "HytaleClient"
-	if os.PathSeparator == '\\' {
-		gameClient += ".exe"
-	}
-	clientPath := filepath.Join(gameLatest, "Client", gameClient)
-	if _, err := os.Stat(clientPath); err == nil {
-		fmt.Println("Game already installed, skipping download.")
-		if progressCallback != nil {
-			progressCallback("game", 100, "Game already installed", "", "", 0, 0)
-		}
-		return nil
-	}
-
-	// Download .pwr if needed
-	if progressCallback != nil {
-		progressCallback("game", 0, "Downloading game files...", fileName, "", 0, 0)
-	}
-
-	pwrPath, err := DownloadPWR(ctx, version, fileName, progressCallback)
-	if err != nil {
-		return err
-	}
-
-	// Apply .pwr using Butler
-	if progressCallback != nil {
-		progressCallback("game", 50, "Extracting game files...", "", "", 0, 0)
-	}
-
-	return ApplyPWR(ctx, pwrPath, progressCallback)
-}
-
 func ApplyPWR(ctx context.Context, pwrFile string, progressCallback func(stage string, progress float64, message string, currentFile string, speed string, downloaded, total int64)) error {
 	gameLatest := filepath.Join(env.GetDefaultAppDir(), "release", "package", "game", "latest")
 

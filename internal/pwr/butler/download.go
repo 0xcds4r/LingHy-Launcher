@@ -2,14 +2,12 @@ package butler
 
 import (
 	"HyLauncher/internal/env"
+	"HyLauncher/internal/util"
 	"context"
 	"fmt"
-	"io"
-	"net/http"
 	"os"
 	"path/filepath"
 	"runtime"
-	"time"
 )
 
 func InstallButler(ctx context.Context, progressCallback func(stage string, progress float64, message string, currentFile string, speed string, downloaded, total int64)) (string, error) {
@@ -53,7 +51,7 @@ func InstallButler(ctx context.Context, progressCallback func(stage string, prog
 		progressCallback("butler", 0, "Downloading Butler...", "butler.zip", "", 0, 0)
 	}
 
-	if err := downloadFile(tempZipPath, url, progressCallback); err != nil {
+	if err := util.DownloadWithProgress(tempZipPath, url, "butler", 0.7, progressCallback); err != nil {
 		_ = os.Remove(tempZipPath)
 		return "", err
 	}
@@ -88,66 +86,4 @@ func InstallButler(ctx context.Context, progressCallback func(stage string, prog
 	}
 
 	return butlerPath, nil
-}
-
-// Download butler with progress
-func downloadFile(dest, url string, progressCallback func(stage string, progress float64, message string, currentFile string, speed string, downloaded, total int64)) error {
-	resp, err := http.Get(url)
-	if err != nil {
-		return err
-	}
-	defer resp.Body.Close()
-
-	out, err := os.Create(dest)
-	if err != nil {
-		return err
-	}
-	defer out.Close()
-
-	total := resp.ContentLength
-	var downloaded int64
-	buf := make([]byte, 32*1024)
-	start := time.Now()
-	lastUpdate := time.Now()
-
-	for {
-		n, err := resp.Body.Read(buf)
-		if n > 0 {
-			if _, wErr := out.Write(buf[:n]); wErr != nil {
-				return wErr
-			}
-			downloaded += int64(n)
-
-			// Update progress every 200ms
-			if time.Since(lastUpdate) > 200*time.Millisecond {
-				if total > 0 {
-					percent := float64(downloaded) / float64(total) * 100
-					elapsed := time.Since(start).Seconds()
-					speed := ""
-					if elapsed > 0 {
-						mbps := float64(downloaded) / 1024 / 1024 / elapsed
-						speed = fmt.Sprintf("%.2f MB/s", mbps)
-					}
-
-					// Map to 0-70% of butler stage
-					butlerProgress := percent * 0.7
-
-					if progressCallback != nil {
-						progressCallback("butler", butlerProgress, "Downloading Butler...", filepath.Base(dest), speed, downloaded, total)
-					}
-
-					fmt.Printf("\r%.1f%% downloaded (%.2f MB/s)", percent, float64(downloaded)/1024/1024/elapsed)
-				}
-				lastUpdate = time.Now()
-			}
-		}
-		if err != nil {
-			if err == io.EOF {
-				break
-			}
-			return err
-		}
-	}
-	fmt.Println()
-	return nil
 }

@@ -4,25 +4,18 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"os"
-	"os/exec"
-	"path/filepath"
 
 	"HyLauncher/internal/env"
-	"HyLauncher/internal/java"
+	"HyLauncher/internal/game"
 	"HyLauncher/internal/pwr"
-	"HyLauncher/internal/pwr/butler"
 
-	"github.com/google/uuid"
 	"github.com/wailsapp/wails/v2/pkg/runtime"
 )
 
-// App struct
 type App struct {
 	ctx context.Context
 }
 
-// ProgressUpdate represents a progress event
 type ProgressUpdate struct {
 	Stage       string  `json:"stage"`
 	Progress    float64 `json:"progress"`
@@ -33,30 +26,23 @@ type ProgressUpdate struct {
 	Total       int64   `json:"total"`
 }
 
-// NewApp creates a new App application struct
 func NewApp() *App {
 	return &App{}
 }
 
-// startup is called when the app starts. The context is saved
-// so we can call the runtime methods
 func (a *App) startup(ctx context.Context) {
 	a.ctx = ctx
 	env.CreateFolders()
 
-	// Clean up any incomplete downloads from previous sessions
-	fmt.Println("Checking for incomplete downloads...")
+	fmt.Println("Cleaning up temporary files...")
 	if err := env.CleanupIncompleteDownloads(); err != nil {
 		fmt.Println("Warning: cleanup failed:", err)
 	}
 }
 
-func (a *App) emitProgress(update ProgressUpdate) {
-	runtime.EventsEmit(a.ctx, "progress-update", update)
-}
-
+// progressCallback is passed to internal packages to report back to the UI
 func (a *App) progressCallback(stage string, progress float64, message string, currentFile string, speed string, downloaded, total int64) {
-	a.emitProgress(ProgressUpdate{
+	runtime.EventsEmit(a.ctx, "progress-update", ProgressUpdate{
 		Stage:       stage,
 		Progress:    progress,
 		Message:     message,
@@ -67,106 +53,27 @@ func (a *App) progressCallback(stage string, progress float64, message string, c
 	})
 }
 
+// GetVersions returns current local version and latest remote version for the UI
+func (a *App) GetVersions() (currentVersion string, latestVersion string) {
+	current := pwr.GetLocalVersion()
+	latest := pwr.FindLatestVersion("release")
+
+	return current, fmt.Sprintf("%d", latest)
+}
+
 func (a *App) DownloadAndLaunch(playerName string) error {
 	if len(playerName) > 16 {
-		return errors.New("Слишком длинный ник")
+		return errors.New("Nickname is too long (max 16 chars)")
 	}
 
-	// JRE Download
-	a.emitProgress(ProgressUpdate{
-		Stage:    "jre",
-		Progress: 0,
-		Message:  "Checking JRE...",
-	})
-
-	if err := java.DownloadJRE(a.ctx, a.progressCallback); err != nil {
+	if err := game.EnsureInstalled(a.ctx, a.progressCallback); err != nil {
 		return err
 	}
 
-	a.emitProgress(ProgressUpdate{
-		Stage:    "jre",
-		Progress: 100,
-		Message:  "JRE ready",
-	})
+	a.progressCallback("launch", 100, "Launching game...", "", "", 0, 0)
 
-	javaBin := java.GetJavaExec()
-
-	// Butler Installation
-	a.emitProgress(ProgressUpdate{
-		Stage:    "butler",
-		Progress: 0,
-		Message:  "Checking Butler...",
-	})
-
-	if _, err := butler.InstallButler(a.ctx, a.progressCallback); err != nil {
-		return err
-	}
-
-	a.emitProgress(ProgressUpdate{
-		Stage:    "butler",
-		Progress: 100,
-		Message:  "Butler ready",
-	})
-
-	version := "release"
-	pwrFile := "1.pwr"
-
-	gameLatest := filepath.Join(env.GetDefaultAppDir(), "release", "package", "game", "latest")
-	gameClient := "HytaleClient"
-	if os.PathSeparator == '\\' {
-		gameClient += ".exe"
-	}
-	clientPath := filepath.Join(gameLatest, "Client", gameClient)
-
-	if _, err := os.Stat(clientPath); os.IsNotExist(err) {
-		// Game Installation
-		a.emitProgress(ProgressUpdate{
-			Stage:    "game",
-			Progress: 0,
-			Message:  "Installing game...",
-		})
-
-		if err := pwr.InstallGame(a.ctx, version, pwrFile, a.progressCallback); err != nil {
-			return err
-		}
-
-		a.emitProgress(ProgressUpdate{
-			Stage:    "game",
-			Progress: 100,
-			Message:  "Game installed",
-		})
-	} else {
-		fmt.Println("Game already installed, skipping download.")
-		a.emitProgress(ProgressUpdate{
-			Stage:    "game",
-			Progress: 100,
-			Message:  "Game already installed",
-		})
-	}
-
-	// Launch
-	a.emitProgress(ProgressUpdate{
-		Stage:    "launch",
-		Progress: 100,
-		Message:  "Launching game...",
-	})
-
-	uuid := uuid.NewString()
-	cmd := exec.Command(clientPath,
-		"--app-dir", gameLatest,
-		"--java-exec", javaBin,
-		"--auth-mode", "offline",
-		"--uuid", uuid,
-		"--name", playerName,
-	)
-
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-	cmd.Stdin = os.Stdin
-
-	fmt.Println("Launching game...")
-	if err := cmd.Start(); err != nil {
-		return err
+	if err := game.Launch(playerName, "latest"); err != nil {
+		return fmt.Errorf("failed to launch: %w", err)
 	}
 
 	return nil

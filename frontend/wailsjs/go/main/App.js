@@ -5,3 +5,7 @@
 export function DownloadAndLaunch(arg1) {
   return window['go']['main']['App']['DownloadAndLaunch'](arg1);
 }
+
+export function GetVersions() {
+  return window['go']['main']['App']['GetVersions']();
+}
