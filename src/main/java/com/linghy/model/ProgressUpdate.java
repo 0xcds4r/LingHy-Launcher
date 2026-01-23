@@ -1,6 +1,7 @@
 package com.linghy.model;
 
-public class ProgressUpdate {
+public class ProgressUpdate
+{
     private final String stage;
     private final double progress;
     private final String message;
@@ -9,8 +10,8 @@ public class ProgressUpdate {
     private final long downloaded;
     private final long total;
 
-    public ProgressUpdate(String stage, double progress, String message,
-                          String currentFile, String speed, long downloaded, long total) {
+    public ProgressUpdate(String stage, double progress, String message, String currentFile, String speed, long downloaded, long total)
+    {
         this.stage = stage;
         this.progress = progress;
         this.message = message;

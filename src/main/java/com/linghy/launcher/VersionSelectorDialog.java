@@ -1,5 +1,6 @@
 package com.linghy.launcher;
 
+import com.linghy.env.Environment;
 import com.linghy.version.GameVersion;
 import com.linghy.version.VersionManager;
 
@@ -8,6 +9,8 @@ import javax.swing.border.EmptyBorder;
 import java.awt.*;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.List;
 
 public class VersionSelectorDialog extends JDialog
@@ -20,11 +23,15 @@ public class VersionSelectorDialog extends JDialog
     private JButton installButton;
     private JButton deleteButton;
     private JButton refreshButton;
+    private JComboBox<String> branchSelector;
+    private String currentBranch = "release";
+    private GameVersion initialSelectedVersion;
 
-    public VersionSelectorDialog(Frame parent, VersionManager versionManager)
+    public VersionSelectorDialog(Frame parent, VersionManager versionManager, GameVersion currentSelected)
     {
         super(parent, "Select game version", true);
         this.versionManager = versionManager;
+        this.initialSelectedVersion = currentSelected;
 
         setSize(800, 600);
         setLocationRelativeTo(parent);
@@ -85,6 +92,62 @@ public class VersionSelectorDialog extends JDialog
         JPanel centerPanel = new JPanel(new BorderLayout(10, 10));
         centerPanel.setBackground(new Color(18, 18, 18));
         centerPanel.setBorder(new EmptyBorder(20, 20, 20, 20));
+
+        JPanel branchPanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 10, 0));
+        branchPanel.setOpaque(false);
+        branchPanel.setBorder(new EmptyBorder(0, 0, 10, 0));
+
+        JLabel branchLabel = new JLabel("Branch:");
+        branchLabel.setForeground(new Color(160, 160, 170));
+        branchLabel.setFont(new Font("Segoe UI", Font.BOLD, 14));
+
+        String[] branches = {"Release", "Pre-Release"};
+        branchSelector = new JComboBox<>(branches);
+        branchSelector.setFont(new Font("Segoe UI", Font.PLAIN, 14));
+        branchSelector.setBackground(new Color(26, 26, 32));
+        branchSelector.setForeground(Color.WHITE);
+        branchSelector.setFocusable(false);
+        branchSelector.setPreferredSize(new Dimension(150, 30));
+        branchSelector.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+
+        branchSelector.setRenderer(new DefaultListCellRenderer()
+        {
+            @Override
+            public Component getListCellRendererComponent(JList<?> list, Object value, int index, boolean isSelected, boolean cellHasFocus)
+            {
+                super.getListCellRendererComponent(list, value, index, isSelected, cellHasFocus);
+
+                setBackground(isSelected ? new Color(255, 168, 69, 100) : new Color(26, 26, 32));
+                setForeground(Color.WHITE);
+                setBorder(new EmptyBorder(5, 10, 5, 10));
+
+                return this;
+            }
+        });
+
+        if (initialSelectedVersion != null)
+        {
+            currentBranch = initialSelectedVersion.getBranch();
+            branchSelector.setSelectedItem(
+                    currentBranch.equals("pre-release") ? "Pre-Release" : "Release"
+            );
+        }
+
+        branchSelector.addActionListener(e ->
+        {
+            String selected = (String) branchSelector.getSelectedItem();
+
+            if (selected != null)
+            {
+                currentBranch = selected.equals("Pre-Release") ? "pre-release" : "release";
+                loadVersions();
+            }
+        });
+
+        branchPanel.add(branchLabel);
+        branchPanel.add(branchSelector);
+
+        centerPanel.add(branchPanel, BorderLayout.NORTH);
 
         listModel = new DefaultListModel<>();
         versionList = new JList<>(listModel);
@@ -290,14 +353,15 @@ public class VersionSelectorDialog extends JDialog
 
             @Override
             protected Void doInBackground() {
-                versions = versionManager.loadCachedVersions();
+                versions = versionManager.loadCachedVersions(currentBranch);
 
                 if (versions.isEmpty())
                 {
                     try {
-                        versions = versionManager.scanAvailableVersions((percent, message) ->
-                                SwingUtilities.invokeLater(() ->
-                                        statusLabel.setText(message + " (" + percent + "%)")));
+                        versions = versionManager.scanAvailableVersions(currentBranch,
+                                (percent, message) ->
+                                        SwingUtilities.invokeLater(() ->
+                                                statusLabel.setText(message + " (" + percent + "%)")));
                     } catch (Exception e) {
                         e.printStackTrace();
                     }
@@ -307,8 +371,24 @@ public class VersionSelectorDialog extends JDialog
             }
 
             @Override
-            protected void done() {
+            protected void done()
+            {
                 displayVersions(versions);
+
+                if (initialSelectedVersion != null)
+                {
+                    for (int i = 0; i < listModel.getSize(); i++)
+                    {
+                        GameVersion v = listModel.getElementAt(i);
+
+                        if (v.getPatchNumber() == initialSelectedVersion.getPatchNumber() && v.getBranch().equals(initialSelectedVersion.getBranch()))
+                        {
+                            versionList.setSelectedIndex(i);
+                            versionList.ensureIndexIsVisible(i);
+                            break;
+                        }
+                    }
+                }
             }
         };
 
@@ -318,6 +398,7 @@ public class VersionSelectorDialog extends JDialog
     private void refreshVersions()
     {
         refreshButton.setEnabled(false);
+        branchSelector.setEnabled(false);
         statusLabel.setText("Updating versions list...");
 
         SwingWorker<Void, Void> worker = new SwingWorker<>() {
@@ -326,12 +407,13 @@ public class VersionSelectorDialog extends JDialog
             @Override
             protected Void doInBackground() {
                 try {
-                    versions = versionManager.scanAvailableVersions((percent, message) ->
-                            SwingUtilities.invokeLater(() ->
-                                    statusLabel.setText(message + " (" + percent + "%)")));
+                    versions = versionManager.scanAvailableVersions(currentBranch,
+                            (percent, message) ->
+                                    SwingUtilities.invokeLater(() ->
+                                            statusLabel.setText(message + " (" + percent + "%)")));
                 } catch (Exception e) {
                     e.printStackTrace();
-                    versions = versionManager.loadCachedVersions();
+                    versions = versionManager.loadCachedVersions(currentBranch);
                 }
                 return null;
             }
@@ -340,6 +422,7 @@ public class VersionSelectorDialog extends JDialog
             protected void done() {
                 displayVersions(versions);
                 refreshButton.setEnabled(true);
+                branchSelector.setEnabled(true);
             }
         };
 
@@ -352,7 +435,10 @@ public class VersionSelectorDialog extends JDialog
 
         for (GameVersion version : versions)
         {
-            boolean actuallyInstalled = versionManager.isVersionInstalled(version.getPatchNumber());
+            boolean actuallyInstalled = versionManager.isVersionInstalled(
+                    version.getPatchNumber(),
+                    version.getBranch()
+            );
 
             GameVersion displayVersion = new GameVersion(
                     version.getName(),
@@ -360,13 +446,15 @@ public class VersionSelectorDialog extends JDialog
                     version.getDownloadUrl(),
                     version.getPatchNumber(),
                     version.getSize(),
-                    actuallyInstalled
+                    actuallyInstalled,
+                    version.getBranch()
             );
 
             listModel.addElement(displayVersion);
         }
 
-        statusLabel.setText("Available versions: " + versions.size());
+        String branchName = currentBranch.equals("pre-release") ? "pre-release" : "release";
+        statusLabel.setText("Available " + branchName + " versions: " + versions.size());
 
         if (!versions.isEmpty()) {
             versionList.setSelectedIndex(0);
@@ -379,7 +467,10 @@ public class VersionSelectorDialog extends JDialog
 
         if (selected != null)
         {
-            boolean installed = versionManager.isVersionInstalled(selected.getPatchNumber());
+            boolean installed = versionManager.isVersionInstalled(
+                    selected.getPatchNumber(),
+                    selected.getBranch()
+            );
             installButton.setEnabled(true);
             installButton.setText("Select");
             deleteButton.setEnabled(installed);
@@ -459,7 +550,14 @@ public class VersionSelectorDialog extends JDialog
         if (confirmed[0])
         {
             try {
-                versionManager.deleteVersion(version.getPatchNumber());
+                versionManager.deleteVersion(version.getPatchNumber(), version.getBranch());
+
+                if (initialSelectedVersion != null && initialSelectedVersion.getPatchNumber() == version.getPatchNumber() && initialSelectedVersion.getBranch().equals(version.getBranch()))
+                {
+                    Path selectedFile = Environment.getDefaultAppDir().resolve("selected_version.json");
+                    Files.deleteIfExists(selectedFile);
+                }
+
                 statusLabel.setText("Deleted: " + version.getName());
 
                 int selectedIndex = versionList.getSelectedIndex();
@@ -469,7 +567,8 @@ public class VersionSelectorDialog extends JDialog
                         version.getDownloadUrl(),
                         version.getPatchNumber(),
                         version.getSize(),
-                        false
+                        false,
+                        version.getBranch()
                 );
                 listModel.set(selectedIndex, updated);
                 updateButtonStates();
@@ -504,13 +603,18 @@ public class VersionSelectorDialog extends JDialog
                         ? "<span style='color:#90EE90;'>✓ Installed</span>"
                         : "<span style='color:#666;'>Not installed</span>";
 
+                String branchBadge = version.isPreRelease()
+                        ? "<span style='color:#FFA845;'>[Pre-Release]</span>"
+                        : "<span style='color:#4A9EFF;'>[Release]</span>";
+
                 String text = String.format(
                         "<html><div style='padding:4px;'>" +
-                                "<div style='font-size:15px; font-weight:bold; margin-bottom:6px;'>%s</div>" +
+                                "<div style='font-size:15px; font-weight:bold; margin-bottom:6px;'>%s %s</div>" +
                                 "<div style='font-size:11px; color:#aaa;'>" +
                                 "Size: <b>%s</b> | Patch: <b>#%d</b> | %s" +
                                 "</div></div></html>",
                         version.getName(),
+                        branchBadge,
                         version.getFormattedSize(),
                         version.getPatchNumber(),
                         installedBadge

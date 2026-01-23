@@ -10,8 +10,8 @@ import java.awt.event.WindowAdapter;
 import java.awt.event.WindowEvent;
 import java.util.Locale;
 
-public class Main {
-
+public class Main
+{
     private static final String[] PROCESS_KEYWORDS = {
             "linghy",
             "hytale",
@@ -20,7 +20,8 @@ public class Main {
 
     private static void killJavaProcesses()
     {
-        for (String keyword : PROCESS_KEYWORDS) {
+        for (String keyword : PROCESS_KEYWORDS)
+        {
             try {
                 String os = System.getProperty("os.name").toLowerCase(Locale.ROOT);
 
@@ -37,6 +38,8 @@ public class Main {
 
     public static void main(String[] args)
     {
+        AffinityMgr.init();
+
         try {
             UIManager.setLookAndFeel(new FlatDarkLaf());
         } catch (Exception e) {
@@ -50,7 +53,8 @@ public class Main {
             System.err.println("Warning: cleanup failed: " + e.getMessage());
         }
 
-        SwingUtilities.invokeLater(() -> {
+        SwingUtilities.invokeLater(() ->
+        {
             LauncherFrame frame = new LauncherFrame();
             frame.addWindowListener(new WindowAdapter() {
                 @Override

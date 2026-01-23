@@ -9,7 +9,8 @@ public class Environment
 {
     private static final String APP_NAME = "hytale";
 
-    public static String getOS() {
+    public static String getOS()
+    {
         String os = System.getProperty("os.name").toLowerCase();
         if (os.contains("win")) return "windows";
         if (os.contains("mac")) return "darwin";
@@ -17,18 +18,21 @@ public class Environment
         return "unknown";
     }
 
-    public static String getArch() {
+    public static String getArch()
+    {
         String arch = System.getProperty("os.arch").toLowerCase();
         if (arch.contains("amd64") || arch.contains("x86_64")) return "amd64";
         if (arch.contains("aarch64") || arch.contains("arm64")) return "arm64";
         return "unknown";
     }
 
-    public static Path getDefaultAppDir() {
+    public static Path getDefaultAppDir()
+    {
         String home = System.getProperty("user.home");
         String os = getOS();
 
-        return switch (os) {
+        return switch (os)
+        {
             case "windows" -> Paths.get(home, "AppData", "Local", APP_NAME);
             case "darwin" -> Paths.get(home, "Library", "Application Support", APP_NAME);
             case "linux" -> Paths.get(home, "." + APP_NAME.toLowerCase());
@@ -36,7 +40,8 @@ public class Environment
         };
     }
 
-    public static void createFolders() throws IOException {
+    public static void createFolders() throws IOException
+    {
         Path basePath = getDefaultAppDir();
         Path packagePath = basePath.resolve("release").resolve("package");
 

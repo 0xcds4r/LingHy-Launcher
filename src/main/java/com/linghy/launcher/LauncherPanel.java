@@ -10,6 +10,7 @@ import javax.swing.*;
 import java.awt.*;
 import java.awt.event.*;
 import java.awt.image.BufferedImage;
+import java.io.InputStream;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.net.URL;
@@ -34,6 +35,8 @@ import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
 import org.jsoup.nodes.Element;
 import org.jsoup.select.Elements;
+
+import static java.awt.Frame.ICONIFIED;
 
 public class LauncherPanel extends JPanel
 {
@@ -74,12 +77,21 @@ public class LauncherPanel extends JPanel
 
     private void loadBackgroundImageAsync()
     {
-        SwingWorker<BufferedImage, Void> worker = new SwingWorker<>() {
+        SwingWorker<BufferedImage, Void> worker = new SwingWorker<>()
+        {
             @Override
-            protected BufferedImage doInBackground() {
+            protected BufferedImage doInBackground()
+            {
                 try {
-                    URI uri = new URI("https://cdn.hytale.com/5e7b9ecb50cbcd001176c5c1_11___z2_camels.png");
-                    return ImageIO.read(uri.toURL());
+                    InputStream is = getClass().getResourceAsStream("/bg01.png");
+
+                    if (is == null)
+                    {
+                        System.err.println("Resource not found: bg01.png");
+                        return null;
+                    }
+
+                    return ImageIO.read(is);
                 } catch (Exception e) {
                     System.err.println("Failed to load background: " + e.getMessage());
                     return null;
@@ -87,15 +99,19 @@ public class LauncherPanel extends JPanel
             }
 
             @Override
-            protected void done() {
+            protected void done()
+            {
                 try {
                     backgroundImage = get();
-                    repaint();
+                    if (backgroundImage != null) {
+                        repaint();
+                    }
                 } catch (Exception e) {
                     System.err.println("Error setting background: " + e.getMessage());
                 }
             }
         };
+
         worker.execute();
     }
 
@@ -169,9 +185,11 @@ public class LauncherPanel extends JPanel
         scrollPane.getVerticalScrollBar().setUnitIncrement(20);
         scrollPane.getVerticalScrollBar().setBlockIncrement(100);
 
-        scrollPane.getVerticalScrollBar().setUI(new javax.swing.plaf.basic.BasicScrollBarUI() {
+        scrollPane.getVerticalScrollBar().setUI(new javax.swing.plaf.basic.BasicScrollBarUI()
+        {
             @Override
-            protected void configureScrollBarColors() {
+            protected void configureScrollBarColors()
+            {
                 this.thumbColor = new Color(255, 168, 69, 120);
                 this.trackColor = new Color(26, 26, 32, 100);
             }
@@ -195,7 +213,8 @@ public class LauncherPanel extends JPanel
             }
 
             @Override
-            protected void paintThumb(Graphics g, JComponent c, Rectangle thumbBounds) {
+            protected void paintThumb(Graphics g, JComponent c, Rectangle thumbBounds)
+            {
                 Graphics2D g2 = (Graphics2D) g.create();
                 g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
                 g2.setColor(thumbColor);
@@ -205,7 +224,8 @@ public class LauncherPanel extends JPanel
             }
 
             @Override
-            protected void paintTrack(Graphics g, JComponent c, Rectangle trackBounds) {
+            protected void paintTrack(Graphics g, JComponent c, Rectangle trackBounds)
+            {
                 Graphics2D g2 = (Graphics2D) g.create();
                 g2.setColor(trackColor);
                 g2.fillRect(trackBounds.x, trackBounds.y, trackBounds.width, trackBounds.height);
@@ -230,7 +250,7 @@ public class LauncherPanel extends JPanel
         titleBar.setPreferredSize(new Dimension(0, 40));
 
         JButton minimizeBtn = createTitleBarButton("-");
-        minimizeBtn.addActionListener(e -> parent.setState(JFrame.ICONIFIED));
+        minimizeBtn.addActionListener(e -> parent.setState(ICONIFIED));
 
         JButton closeBtn = createTitleBarButton("×");
         closeBtn.addActionListener(e -> System.exit(0));
@@ -280,19 +300,22 @@ public class LauncherPanel extends JPanel
         usernameField.setPreferredSize(new Dimension(280, 32));
         usernameField.setMaximumSize(new Dimension(340, 32));
 
-        usernameField.addActionListener(e -> {
+        usernameField.addActionListener(e ->
+        {
             saveUsername();
             usernameField.transferFocus();
         });
 
-        usernameField.addFocusListener(new FocusAdapter() {
+        usernameField.addFocusListener(new FocusAdapter()
+        {
             @Override
             public void focusGained(FocusEvent e) {
                 usernameField.setBorder(BorderFactory.createLineBorder(new Color(255, 168, 69, 160), 1));
             }
 
             @Override
-            public void focusLost(FocusEvent e) {
+            public void focusLost(FocusEvent e)
+            {
                 usernameField.setBorder(BorderFactory.createEmptyBorder(6, 12, 6, 12));
                 saveUsername();
                 usernameField.setCaretPosition(usernameField.getText().length());
@@ -304,7 +327,7 @@ public class LauncherPanel extends JPanel
 
         panel.add(Box.createVerticalStrut(8));
 
-        JLabel infoLine1 = new JLabel("LingHy Launcher (v1.4)");
+        JLabel infoLine1 = new JLabel("LingHy Launcher (v1.5)");
         infoLine1.setForeground(new Color(120, 120, 130));
         infoLine1.setFont(new Font("Segoe UI", Font.PLAIN, 10));
         infoLine1.setAlignmentX(Component.CENTER_ALIGNMENT);
@@ -323,11 +346,14 @@ public class LauncherPanel extends JPanel
     {
         String name = usernameField.getText().trim();
 
-        if (name.isEmpty()) {
+        if (name.isEmpty())
+        {
             name = "";
             usernameField.setText(name);
         }
-        if (name.length() > 16) {
+
+        if (name.length() > 16)
+        {
             name = name.substring(0, 16);
             usernameField.setText(name);
         }
@@ -408,7 +434,8 @@ public class LauncherPanel extends JPanel
             System.err.println("Hytale News Loading Error: " + e.getMessage());
         }
 
-        if (news.isEmpty()) {
+        if (news.isEmpty())
+        {
             news.add(new NewsItem(
                     "News unavailable",
                     LocalDate.now().format(DateTimeFormatter.ofPattern("dd.MM.yyyy")),
@@ -469,10 +496,13 @@ public class LauncherPanel extends JPanel
 
         newsCard.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
 
-        newsCard.addMouseListener(new MouseAdapter() {
+        newsCard.addMouseListener(new MouseAdapter()
+        {
             @Override
-            public void mouseClicked(MouseEvent e) {
-                if (!item.url.isEmpty()) {
+            public void mouseClicked(MouseEvent e)
+            {
+                if (!item.url.isEmpty())
+                {
                     try {
                         Desktop.getDesktop().browse(new URI(item.url));
                     } catch (Exception ex) {
@@ -482,7 +512,8 @@ public class LauncherPanel extends JPanel
             }
 
             @Override
-            public void mouseEntered(MouseEvent e) {
+            public void mouseEntered(MouseEvent e)
+            {
                 newsCard.setBackground(new Color(20, 20, 28, 220));
                 newsCard.setBorder(BorderFactory.createCompoundBorder(
                         BorderFactory.createLineBorder(new Color(255, 168, 69, 180), 2, false),
@@ -491,7 +522,8 @@ public class LauncherPanel extends JPanel
             }
 
             @Override
-            public void mouseExited(MouseEvent e) {
+            public void mouseExited(MouseEvent e)
+            {
                 newsCard.setBackground(new Color(15, 15, 20, 200));
                 newsCard.setBorder(BorderFactory.createCompoundBorder(
                         BorderFactory.createLineBorder(new Color(255, 168, 69, 100), 1, false),
@@ -508,9 +540,11 @@ public class LauncherPanel extends JPanel
 
         if (!item.imageUrl.isEmpty())
         {
-            SwingWorker<ImageIcon, Void> imgWorker = new SwingWorker<>() {
+            SwingWorker<ImageIcon, Void> imgWorker = new SwingWorker<>()
+            {
                 @Override
-                protected ImageIcon doInBackground() throws Exception {
+                protected ImageIcon doInBackground() throws Exception
+                {
                     try {
                         BufferedImage original = ImageIO.read(new URL(item.imageUrl));
                         if (original == null) return null;
@@ -552,10 +586,12 @@ public class LauncherPanel extends JPanel
                 }
 
                 @Override
-                protected void done() {
+                protected void done()
+                {
                     try {
                         ImageIcon icon = get(3, TimeUnit.SECONDS);
-                        if (icon != null) {
+                        if (icon != null)
+                        {
                             JLabel imgLabel = new JLabel(icon);
                             imgLabel.setHorizontalAlignment(SwingConstants.CENTER);
                             imgLabel.setVerticalAlignment(SwingConstants.CENTER);
@@ -570,7 +606,9 @@ public class LauncherPanel extends JPanel
                             imgPanel.add(imgLabel, BorderLayout.CENTER);
                             imgPanel.revalidate();
                             imgPanel.repaint();
-                        } else {
+                        }
+                        else
+                        {
                             showPlaceholder(imgPanel);
                         }
                     } catch (Exception e) {
@@ -584,7 +622,9 @@ public class LauncherPanel extends JPanel
             loadingLabel.setForeground(new Color(255, 168, 69, 100));
             loadingLabel.setFont(new Font("Segoe UI", Font.ITALIC, 11));
             imgPanel.add(loadingLabel, BorderLayout.CENTER);
-        } else {
+        }
+        else
+        {
             showPlaceholder(imgPanel);
         }
 
@@ -617,14 +657,16 @@ public class LauncherPanel extends JPanel
         loadingLabel.setFont(new Font("Segoe UI", Font.PLAIN, 14));
         panel.add(loadingLabel);
 
-        SwingWorker<List<NewsItem>, Void> newsWorker = new SwingWorker<>() {
+        SwingWorker<List<NewsItem>, Void> newsWorker = new SwingWorker<>()
+        {
             @Override
             protected List<NewsItem> doInBackground() {
                 return fetchHytaleNews();
             }
 
             @Override
-            protected void done() {
+            protected void done()
+            {
                 try {
                     List<NewsItem> newsItems = get();
                     panel.removeAll();
@@ -637,7 +679,8 @@ public class LauncherPanel extends JPanel
 
                     panel.revalidate();
                     panel.repaint();
-                } catch (Exception e) {
+                } catch (Exception e)
+                {
                     System.err.println("Error loading news: " + e.getMessage());
                     panel.removeAll();
 
@@ -687,7 +730,7 @@ public class LauncherPanel extends JPanel
             openDataFolder();
         });
 
-        JButton userButton = createFolderDialogButton("UserData");
+        JButton userButton = createFolderDialogButton("Mods / Saves");
         userButton.setToolTipText("Open UserData folder (Mods, Saves & etc.)");
         userButton.addActionListener(e -> {
             dialog.dispose();
@@ -710,7 +753,10 @@ public class LauncherPanel extends JPanel
 
             if (selectedVersion != null)
             {
-                gameFolder = versionManager.getVersionDirectory(selectedVersion.getPatchNumber());
+                gameFolder = versionManager.getVersionDirectory(
+                        selectedVersion.getPatchNumber(),
+                        selectedVersion.getBranch()
+                );
             }
             else
             {
@@ -759,13 +805,17 @@ public class LauncherPanel extends JPanel
 
     private void openFolderInSystem(Path folder) throws Exception
     {
-        if (Desktop.isDesktopSupported()) {
+        if (Desktop.isDesktopSupported())
+        {
             Desktop.getDesktop().open(folder.toFile());
-        } else {
+        }
+        else
+        {
             String os = Environment.getOS();
             ProcessBuilder pb;
 
-            switch (os) {
+            switch (os)
+            {
                 case "windows" -> pb = new ProcessBuilder("explorer", folder.toString());
                 case "darwin" -> pb = new ProcessBuilder("open", folder.toString());
                 case "linux" -> pb = new ProcessBuilder("xdg-open", folder.toString());
@@ -795,7 +845,8 @@ public class LauncherPanel extends JPanel
         button.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
         button.setPreferredSize(new Dimension(350, 45));
 
-        button.addMouseListener(new MouseAdapter() {
+        button.addMouseListener(new MouseAdapter()
+        {
             @Override
             public void mouseEntered(MouseEvent e) {
                 button.setBackground(new Color(80, 80, 90));
@@ -832,13 +883,14 @@ public class LauncherPanel extends JPanel
         folderButton.setFont(new Font("Segoe UI", Font.PLAIN, 13));
         folderButton.setForeground(Color.WHITE);
         folderButton.setBackground(new Color(60, 60, 70));
-        folderButton.setPreferredSize(new Dimension(90, 90));
+        folderButton.setPreferredSize(new Dimension(140, 90));
         folderButton.setFocusPainted(false);
         folderButton.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
         folderButton.setToolTipText("Open game folder");
         folderButton.addActionListener(e -> openGameFolder());
 
-        folderButton.addMouseListener(new MouseAdapter() {
+        folderButton.addMouseListener(new MouseAdapter()
+        {
             @Override
             public void mouseEntered(MouseEvent e) {
                 folderButton.setBackground(new Color(80, 80, 90));
@@ -868,18 +920,34 @@ public class LauncherPanel extends JPanel
         JPanel progressPanel = createProgressSection();
         bottom.add(progressPanel, BorderLayout.EAST);
 
-        SwingWorker<GameVersion, Void> versionWorker = new SwingWorker<>() {
+        SwingWorker<GameVersion, Void> versionWorker = new SwingWorker<>()
+        {
             @Override
-            protected GameVersion doInBackground() {
-                List<GameVersion> versions = versionManager.loadCachedVersions();
+            protected GameVersion doInBackground()
+            {
+                GameVersion savedVersion = versionManager.loadSelectedVersion();
+                if (savedVersion != null)
+                {
+                    if (versionManager.isVersionInstalled(savedVersion.getPatchNumber(), savedVersion.getBranch())) {
+                        return savedVersion;
+                    }
+                }
+
+                List<GameVersion> versions = versionManager.loadCachedVersions("release");
+                if (versions.isEmpty()) {
+                    versions = versionManager.loadCachedVersions("pre-release");
+                }
+
                 return versions.isEmpty() ? null : versions.get(0);
             }
 
             @Override
-            protected void done() {
+            protected void done()
+            {
                 try {
                     GameVersion version = get();
-                    if (version != null && selectedVersion == null) {
+                    if (version != null && selectedVersion == null)
+                    {
                         selectedVersion = version;
                         updateFolderButtonText();
                     }
@@ -899,8 +967,10 @@ public class LauncherPanel extends JPanel
 
         if (selectedVersion != null)
         {
+            String branchLabel = selectedVersion.isPreRelease() ? "Pre-" : "";
             folderButton.setText(String.format(
-                    "Patch %d",
+                    "%sPatch %d",
+                    branchLabel,
                     selectedVersion.getPatchNumber()
             ));
             folderButton.setToolTipText("Open game folder - " + selectedVersion.getName());
@@ -916,7 +986,8 @@ public class LauncherPanel extends JPanel
     {
         VersionSelectorDialog dialog = new VersionSelectorDialog(
                 (Frame) SwingUtilities.getWindowAncestor(this),
-                versionManager
+                versionManager,
+                selectedVersion
         );
 
         dialog.setVisible(true);
@@ -925,31 +996,16 @@ public class LauncherPanel extends JPanel
         if (selected != null)
         {
             selectedVersion = selected;
+            versionManager.saveSelectedVersion(selected);
             playButton.setText("PLAY");
             updateFolderButtonText();
             System.out.println("Selected version: " + selected.getName());
         }
     }
 
-    private JButton createNavButton(String text)
-    {
-        JButton btn = new JButton(text);
-        btn.setForeground(Color.GRAY);
-        btn.setBackground(new Color(9, 9, 9, 140));
-        btn.setBorder(BorderFactory.createLineBorder(new Color(255, 168, 69, 26), 1, true));
-        btn.setFocusPainted(false);
-        btn.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
-        btn.addMouseListener(new MouseAdapter() {
-            public void mouseEntered(MouseEvent e) {
-                btn.setBackground(new Color(255, 168, 69, 13));
-                btn.setBorder(BorderFactory.createLineBorder(new Color(255, 168, 69, 77), 1, true));
-            }
-            public void mouseExited(MouseEvent e) {
-                btn.setBackground(new Color(9, 9, 9, 140));
-                btn.setBorder(BorderFactory.createLineBorder(new Color(255, 168, 69, 26), 1, true));
-            }
-        });
-        return btn;
+    @Deprecated
+    private JButton createNavButton(String text) {
+        return null;
     }
 
     private JPanel createProgressSection()
@@ -1014,7 +1070,11 @@ public class LauncherPanel extends JPanel
 
         if (selectedVersion == null)
         {
-            List<GameVersion> versions = versionManager.loadCachedVersions();
+            List<GameVersion> versions = versionManager.loadCachedVersions("release");
+            if (versions.isEmpty()) {
+                versions = versionManager.loadCachedVersions("pre-release");
+            }
+
             if (versions.isEmpty())
             {
                 JOptionPane.showMessageDialog(this,
@@ -1034,9 +1094,11 @@ public class LauncherPanel extends JPanel
         String finalPlayerName = playerName;
         GameVersion versionToInstall = selectedVersion;
 
-        SwingWorker<Path, ProgressUpdate> worker = new SwingWorker<>() {
+        SwingWorker<Path, ProgressUpdate> worker = new SwingWorker<>()
+        {
             @Override
-            protected Path doInBackground() throws Exception {
+            protected Path doInBackground() throws Exception
+            {
                 try {
                     publish(new ProgressUpdate("jre", 0, "Checking JRE...", "", "", 0, 0));
                     JREDownloader.downloadJRE(this::publish);
@@ -1051,21 +1113,24 @@ public class LauncherPanel extends JPanel
                     publish(new ProgressUpdate("launch", 100, "Launching game...", "", "", 0, 0));
                     return gameDir;
 
-                } catch (Exception e) {
+                } catch (Exception e)
+                {
                     e.printStackTrace();
                     throw e;
                 }
             }
 
             @Override
-            protected void process(java.util.List<ProgressUpdate> chunks) {
+            protected void process(java.util.List<ProgressUpdate> chunks)
+            {
                 for (ProgressUpdate update : chunks) {
                     updateProgress(update);
                 }
             }
 
             @Override
-            protected void done() {
+            protected void done()
+            {
                 try {
                     Path gameDir = get();
 
@@ -1080,7 +1145,8 @@ public class LauncherPanel extends JPanel
                     statusLabel.setText("READY TO PLAY");
                     speedLabel.setText("Ready");
 
-                } catch (Exception e) {
+                } catch (Exception e)
+                {
                     e.printStackTrace();
                     playButton.setText("ERROR - RETRY");
                     playButton.setEnabled(true);
@@ -1124,15 +1190,19 @@ public class LauncherPanel extends JPanel
 
         String[] candidates = {"HytaleClient", "Hytale", "HytaleClient.bin.x86_64"};
 
-        for (String name : candidates) {
+        for (String name : candidates)
+        {
             Path candidate = clientDir.resolve(name);
+
             if (Files.exists(candidate) && Files.isExecutable(candidate)) {
                 return name;
             }
         }
 
-        try (DirectoryStream<Path> stream = Files.newDirectoryStream(clientDir)) {
-            for (Path entry : stream) {
+        try (DirectoryStream<Path> stream = Files.newDirectoryStream(clientDir))
+        {
+            for (Path entry : stream)
+            {
                 if (Files.isRegularFile(entry) && Files.isExecutable(entry)) {
                     return entry.getFileName().toString();
                 }
@@ -1179,9 +1249,10 @@ public class LauncherPanel extends JPanel
                 "--java-exec", JREDownloader.getJavaExec(),
                 "--auth-mode", "offline",
                 "--uuid", UUIDGen.generateUUID(playerName),
-                "--name", playerName,
-                "--identity-token", UUIDGen.generateIdentityToken(playerName),
-                "--session-token", UUIDGen.generateSessionToken()
+                "--name", playerName
+                //,
+//                "--identity-token", UUIDGen.generateIdentityToken(playerName),
+//                "--session-token", UUIDGen.generateSessionToken()
         );
 
         pb.directory(gameDir.toFile());
@@ -1192,11 +1263,14 @@ public class LauncherPanel extends JPanel
         System.out.println("Command: " + pb.command());
 
         Process process = pb.start();
+
+        SwingUtilities.invokeLater(() -> {
+            parent.setExtendedState(ICONIFIED);
+        });
     }
 
     @Deprecated
-    private void launchGame(String playerName) throws Exception
-    {
+    private void launchGame(String playerName) throws Exception {
         throw new Exception("This method is deprecated");
     }
 }

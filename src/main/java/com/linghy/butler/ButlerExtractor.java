@@ -7,12 +7,16 @@ import org.apache.commons.compress.archivers.zip.ZipFile;
 import java.io.*;
 import java.nio.file.*;
 
-public class ButlerExtractor {
-    public static void extractButler(Path zipFile, Path destDir) throws IOException {
-        try (ZipFile zip = new ZipFile(zipFile.toFile())) {
+public class ButlerExtractor
+{
+    public static void extractButler(Path zipFile, Path destDir) throws IOException
+    {
+        try (ZipFile zip = new ZipFile(zipFile.toFile()))
+        {
             var entries = zip.getEntries();
 
-            while (entries.hasMoreElements()) {
+            while (entries.hasMoreElements())
+            {
                 ZipArchiveEntry entry = entries.nextElement();
                 Path filePath = destDir.resolve(entry.getName()).normalize();
 
@@ -20,9 +24,12 @@ public class ButlerExtractor {
                     throw new IOException("Illegal file path: " + entry.getName());
                 }
 
-                if (entry.isDirectory()) {
+                if (entry.isDirectory())
+                {
                     Files.createDirectories(filePath);
-                } else {
+                }
+                else
+                {
                     Files.createDirectories(filePath.getParent());
 
                     try (InputStream in = zip.getInputStream(entry);
@@ -30,7 +37,8 @@ public class ButlerExtractor {
                         in.transferTo(out);
                     }
 
-                    if (!Environment.getOS().equals("windows")) {
+                    if (!Environment.getOS().equals("windows"))
+                    {
                         int unixMode = entry.getUnixMode();
                         if ((unixMode & 0100) != 0) {
                             filePath.toFile().setExecutable(true);

@@ -15,11 +15,13 @@ import java.nio.file.*;
 import java.security.MessageDigest;
 import java.util.HexFormat;
 
-public class JREDownloader {
+public class JREDownloader
+{
     private static final String JRE_MANIFEST_URL =
             "https://launcher.hytale.com/version/release/jre.json";
 
-    public static void downloadJRE(ProgressCallback callback) throws Exception {
+    public static void downloadJRE(ProgressCallback callback) throws Exception
+    {
         String osName = Environment.getOS();
         String arch = Environment.getArch();
 
@@ -28,7 +30,8 @@ public class JREDownloader {
         Path jreLatest = basePath.resolve("release").resolve("package")
                 .resolve("jre").resolve("latest");
 
-        if (isJREInstalled(jreLatest)) {
+        if (isJREInstalled(jreLatest))
+        {
             System.out.println("JRE already installed, skipping");
             callback.onProgress(new ProgressUpdate("jre", 100,
                     "JRE already installed", "", "", 0, 0));
@@ -61,7 +64,8 @@ public class JREDownloader {
 
         Files.deleteIfExists(tempFile);
 
-        if (!Files.exists(cacheFile)) {
+        if (!Files.exists(cacheFile))
+        {
             System.out.println("Downloading JRE...");
             callback.onProgress(new ProgressUpdate("jre", 0,
                     "Downloading JRE...", fileName, "", 0, 0));
@@ -74,7 +78,8 @@ public class JREDownloader {
         callback.onProgress(new ProgressUpdate("jre", 90,
                 "Verifying JRE...", fileName, "", 0, 0));
 
-        if (!verifySHA256(cacheFile, platform.getSha256())) {
+        if (!verifySHA256(cacheFile, platform.getSha256()))
+        {
             Files.deleteIfExists(cacheFile);
             throw new Exception("SHA256 verification failed");
         }
@@ -85,7 +90,8 @@ public class JREDownloader {
 
         JREExtractor.extractJRE(cacheFile, jreLatest);
 
-        if (!osName.equals("windows")) {
+        if (!osName.equals("windows"))
+        {
             Path javaBin = jreLatest.resolve("bin").resolve("java");
             if (Files.exists(javaBin)) {
                 javaBin.toFile().setExecutable(true);
@@ -100,7 +106,8 @@ public class JREDownloader {
     }
 
     private static void downloadFile(String url, Path dest,
-                                     ProgressCallback callback, String fileName) throws Exception {
+                                     ProgressCallback callback, String fileName) throws Exception
+    {
         HttpClient client = HttpClient.newHttpClient();
         HttpRequest request = HttpRequest.newBuilder()
                 .uri(URI.create(url))
@@ -116,17 +123,20 @@ public class JREDownloader {
         long lastUpdate = startTime;
 
         try (InputStream in = response.body();
-             OutputStream out = Files.newOutputStream(dest)) {
-
+             OutputStream out = Files.newOutputStream(dest))
+        {
             byte[] buffer = new byte[8192];
             int bytesRead;
 
-            while ((bytesRead = in.read(buffer)) != -1) {
+            while ((bytesRead = in.read(buffer)) != -1)
+            {
                 out.write(buffer, 0, bytesRead);
                 downloaded += bytesRead;
 
                 long now = System.currentTimeMillis();
-                if (now - lastUpdate > 200) {
+
+                if (now - lastUpdate > 200)
+                {
                     double percent = total > 0 ? (downloaded * 100.0 / total) : 0;
                     double elapsed = (now - startTime) / 1000.0;
                     String speed = elapsed > 0
@@ -142,9 +152,11 @@ public class JREDownloader {
         }
     }
 
-    private static boolean verifySHA256(Path file, String expected) throws Exception {
+    private static boolean verifySHA256(Path file, String expected) throws Exception
+    {
         MessageDigest digest = MessageDigest.getInstance("SHA-256");
-        try (InputStream in = Files.newInputStream(file)) {
+        try (InputStream in = Files.newInputStream(file))
+        {
             byte[] buffer = new byte[8192];
             int bytesRead;
             while ((bytesRead = in.read(buffer)) != -1) {
@@ -156,13 +168,15 @@ public class JREDownloader {
         return calculated.equalsIgnoreCase(expected);
     }
 
-    private static boolean isJREInstalled(Path jreDir) {
+    private static boolean isJREInstalled(Path jreDir)
+    {
         String javaBin = Environment.getOS().equals("windows")
                 ? "java.exe" : "java";
         return Files.exists(jreDir.resolve("bin").resolve(javaBin));
     }
 
-    public static String getJavaExec() {
+    public static String getJavaExec()
+    {
         Path jreDir = Environment.getDefaultAppDir()
                 .resolve("release").resolve("package").resolve("jre").resolve("latest");
 

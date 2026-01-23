@@ -2,11 +2,13 @@ package com.linghy.model;
 
 import java.util.Map;
 
-public class JREManifest {
+public class JREManifest
+{
     private String version;
     private Map<String, Map<String, JREPlatform>> download_url;
 
-    public static class JREPlatform {
+    public static class JREPlatform
+    {
         private String url;
         private String sha256;
 

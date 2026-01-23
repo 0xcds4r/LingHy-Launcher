@@ -34,22 +34,30 @@ public class JREExtractor
         flattenJREDir(destDir);
     }
 
-    private static void extractZip(Path zipFile, Path destDir) throws IOException {
-        try (ZipInputStream zis = new ZipInputStream(Files.newInputStream(zipFile))) {
+    private static void extractZip(Path zipFile, Path destDir) throws IOException
+    {
+        try (ZipInputStream zis = new ZipInputStream(Files.newInputStream(zipFile)))
+        {
             ZipEntry entry;
-            while ((entry = zis.getNextEntry()) != null) {
+
+            while ((entry = zis.getNextEntry()) != null)
+            {
                 Path filePath = destDir.resolve(entry.getName()).normalize();
 
                 if (!filePath.startsWith(destDir)) {
                     throw new IOException("Illegal file path: " + entry.getName());
                 }
 
-                if (entry.isDirectory()) {
+                if (entry.isDirectory())
+                {
                     Files.createDirectories(filePath);
-                } else {
+                }
+                else
+                {
                     Files.createDirectories(filePath.getParent());
                     Files.copy(zis, filePath, StandardCopyOption.REPLACE_EXISTING);
                 }
+
                 zis.closeEntry();
             }
         }
@@ -70,9 +78,12 @@ public class JREExtractor
                     throw new IOException("Illegal file path: " + entry.getName());
                 }
 
-                if (entry.isDirectory()) {
+                if (entry.isDirectory())
+                {
                     Files.createDirectories(filePath);
-                } else {
+                }
+                else
+                {
                     Files.createDirectories(filePath.getParent());
                     Files.copy(tai, filePath, StandardCopyOption.REPLACE_EXISTING);
 

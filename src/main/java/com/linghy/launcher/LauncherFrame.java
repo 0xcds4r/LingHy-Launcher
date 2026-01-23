@@ -5,14 +5,27 @@ import java.awt.*;
 
 public class LauncherFrame extends JFrame
 {
-    private static final int WIDTH = 1280;
-    private static final int HEIGHT = 720;
-
     public LauncherFrame()
     {
-        setTitle("LingHy v1.4");
+        setTitle("LingHy v1.5");
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
-        setSize(WIDTH, HEIGHT);
+
+        Dimension screen = Toolkit.getDefaultToolkit().getScreenSize();
+
+        int w = (int) (screen.width  * 0.70);
+        int h = (int) (screen.height * 0.673);
+
+        double ratio = 16.0 / 9.0;
+        if ((double) w / h > ratio)
+        {
+            w = (int) (h * ratio);
+        }
+        else
+        {
+            h = (int) (w / ratio);
+        }
+
+        setSize(w, h);
         setResizable(false);
         setUndecorated(true);
         setLocationRelativeTo(null);
@@ -25,7 +38,8 @@ public class LauncherFrame extends JFrame
         addWindowDragListener();
     }
 
-    private void addWindowDragListener() {
+    private void addWindowDragListener()
+    {
         Point dragOffset = new Point();
 
         addMouseListener(new java.awt.event.MouseAdapter() {

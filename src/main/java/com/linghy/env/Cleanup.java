@@ -22,7 +22,8 @@ public class Cleanup
         }
     }
 
-    private static void cleanDirectory(Path dir, String[] extensions) throws IOException {
+    private static void cleanDirectory(Path dir, String[] extensions) throws IOException
+    {
         if (!Files.exists(dir)) return;
 
         try (DirectoryStream<Path> stream = Files.newDirectoryStream(dir)) {
@@ -41,7 +42,8 @@ public class Cleanup
         }
     }
 
-    private static void cleanIncompleteGame(Path gameDir) throws IOException {
+    private static void cleanIncompleteGame(Path gameDir) throws IOException
+    {
         if (!Files.exists(gameDir)) return;
 
         String gameClient = Environment.getOS().equals("windows")
@@ -54,10 +56,12 @@ public class Cleanup
         }
     }
 
-    private static void deleteRecursively(Path path) throws IOException {
+    private static void deleteRecursively(Path path) throws IOException
+    {
         if (!Files.exists(path)) return;
 
-        Files.walkFileTree(path, new SimpleFileVisitor<>() {
+        Files.walkFileTree(path, new SimpleFileVisitor<>()
+        {
             @Override
             public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) throws IOException {
                 Files.delete(file);

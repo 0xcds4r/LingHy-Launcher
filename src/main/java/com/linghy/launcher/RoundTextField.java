@@ -3,7 +3,8 @@ package com.linghy.launcher;
 import javax.swing.*;
 import java.awt.*;
 
-class RoundTextField extends JTextField {
+class RoundTextField extends JTextField
+{
     private static final int ARC = 12;
 
     public RoundTextField(String text) {
@@ -12,8 +13,10 @@ class RoundTextField extends JTextField {
     }
 
     @Override
-    protected void paintComponent(Graphics g) {
-        if (!isOpaque()) {
+    protected void paintComponent(Graphics g)
+    {
+        if (!isOpaque())
+        {
             Graphics2D g2 = (Graphics2D) g.create();
             g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
 
@@ -22,6 +25,7 @@ class RoundTextField extends JTextField {
 
             g2.dispose();
         }
+
         super.paintComponent(g);
     }
 

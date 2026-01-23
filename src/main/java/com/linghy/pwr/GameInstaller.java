@@ -15,9 +15,15 @@ public class GameInstaller
     public static Path installGameVersion(GameVersion version, ProgressCallback callback) throws Exception
     {
         int patchNumber = version.getPatchNumber();
+        String branch = version.getBranch();
+
+        String dirName = branch.equals("pre-release")
+                ? "patch-pre-" + patchNumber
+                : "patch-" + patchNumber;
+
         Path gameDir = Environment.getDefaultAppDir()
                 .resolve("release").resolve("package")
-                .resolve("game").resolve("patch-" + patchNumber);
+                .resolve("game").resolve(dirName);
 
         String gameClient = Environment.getOS().equals("windows")
                 ? "HytaleClient.exe" : "HytaleClient";

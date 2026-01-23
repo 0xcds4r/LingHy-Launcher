@@ -37,8 +37,7 @@ public class VersionManager
         this.gson = new Gson();
     }
 
-
-    public List<GameVersion> scanAvailableVersions(ProgressListener listener) throws Exception
+    public List<GameVersion> scanAvailableVersions(String branch, ProgressListener listener) throws Exception
     {
         String os = Environment.getOS();
         String arch = Environment.getArch();
@@ -47,12 +46,12 @@ public class VersionManager
         ExecutorService executor = Executors.newFixedThreadPool(SCAN_THREADS);
         List<Future<GameVersion>> futures = new ArrayList<>();
 
-        listener.onProgress(0, "Scanning version...");
+        listener.onProgress(0, "Scanning " + branch + " versions...");
 
         for (int i = 0; i <= MAX_PATCH_SCAN; i++)
         {
             final int patchNumber = i;
-            futures.add(executor.submit(() -> checkPatchExists(os, arch, patchNumber)));
+            futures.add(executor.submit(() -> checkPatchExists(os, arch, patchNumber, branch)));
         }
 
         int completed = 0;
@@ -64,7 +63,7 @@ public class VersionManager
                     versions.add(version);
                 }
             } catch (Exception e) {
-
+                // ...
             }
 
             completed++;
@@ -76,17 +75,17 @@ public class VersionManager
 
         versions.sort(Comparator.comparingInt(GameVersion::getPatchNumber).reversed());
 
-        saveAvailableVersions(versions);
+        saveAvailableVersions(versions, branch);
 
         listener.onProgress(100, "count: " + versions.size());
         return versions;
     }
 
-    private GameVersion checkPatchExists(String os, String arch, int patchNumber)
+    private GameVersion checkPatchExists(String os, String arch, int patchNumber, String branch)
     {
         String fileName = patchNumber + ".pwr";
-        String url = String.format("%s/%s/%s/release/0/%s",
-                PATCHES_BASE_URL, os, arch, fileName);
+        String url = String.format("%s/%s/%s/%s/0/%s",
+                PATCHES_BASE_URL, os, arch, branch, fileName);
 
         try {
             HttpRequest request = HttpRequest.newBuilder()
@@ -98,54 +97,100 @@ public class VersionManager
             HttpResponse<Void> response = httpClient.send(request,
                     HttpResponse.BodyHandlers.discarding());
 
-            if (response.statusCode() == 200) {
+            if (response.statusCode() == 200)
+            {
                 long size = response.headers()
                         .firstValueAsLong("Content-Length")
                         .orElse(-1);
 
+                String versionName = branch.equals("pre-release")
+                        ? "Pre-Release " + patchNumber
+                        : "Release " + patchNumber;
+
                 return new GameVersion(
-                        "Release " + patchNumber,
+                        versionName,
                         fileName,
                         url,
                         patchNumber,
                         size,
-                        false
+                        false,
+                        branch
                 );
             }
         } catch (Exception e) {
-
+            // ...
         }
 
         return null;
     }
 
-    public List<GameVersion> loadCachedVersions()
+    public List<GameVersion> loadCachedVersions(String branch)
     {
         try {
-            if (Files.exists(versionsFile)) {
-                String json = Files.readString(versionsFile);
+            Path cacheFile = getCacheFile(branch);
+            if (Files.exists(cacheFile))
+            {
+                String json = Files.readString(cacheFile);
                 return gson.fromJson(json, new TypeToken<List<GameVersion>>(){}.getType());
             }
         } catch (IOException e) {
-            System.err.println("Failed to load installed versions cache: " + e.getMessage());
+            System.err.println("Failed to load cached versions for " + branch + ": " + e.getMessage());
         }
         return new ArrayList<>();
     }
 
-    private void saveAvailableVersions(List<GameVersion> versions)
+    public void saveSelectedVersion(GameVersion version)
     {
         try {
-            String json = gson.toJson(versions);
-            Files.writeString(versionsFile, json);
+            Path selectedFile = Environment.getDefaultAppDir().resolve("selected_version.json");
+            String json = gson.toJson(version);
+            Files.writeString(selectedFile, json);
         } catch (IOException e) {
-            System.err.println("Failed to save installed versions cache: " + e.getMessage());
+            System.err.println("Failed to save selected version: " + e.getMessage());
+        }
+    }
+
+    public GameVersion loadSelectedVersion()
+    {
+        try {
+            Path selectedFile = Environment.getDefaultAppDir().resolve("selected_version.json");
+            if (Files.exists(selectedFile))
+            {
+                String json = Files.readString(selectedFile);
+                return gson.fromJson(json, GameVersion.class);
+            }
+        } catch (IOException e) {
+            System.err.println("Failed to load selected version: " + e.getMessage());
+        }
+        return null;
+    }
+
+    private void saveAvailableVersions(List<GameVersion> versions, String branch)
+    {
+        try {
+            Path cacheFile = getCacheFile(branch);
+            String json = gson.toJson(versions);
+            Files.writeString(cacheFile, json);
+        } catch (IOException e) {
+            System.err.println("Failed to save cached versions for " + branch + ": " + e.getMessage());
+        }
+    }
+
+    private Path getCacheFile(String branch)
+    {
+        Path appDir = Environment.getDefaultAppDir();
+        if (branch.equals("pre-release")) {
+            return appDir.resolve("available_versions_prerelease.json");
+        } else {
+            return appDir.resolve("available_versions_release.json");
         }
     }
 
     public List<GameVersion> getInstalledVersions()
     {
         try {
-            if (Files.exists(installedVersionsFile)) {
+            if (Files.exists(installedVersionsFile))
+            {
                 String json = Files.readString(installedVersionsFile);
                 return gson.fromJson(json, new TypeToken<List<GameVersion>>(){}.getType());
             }
@@ -159,7 +204,8 @@ public class VersionManager
     {
         List<GameVersion> installed = getInstalledVersions();
 
-        installed.removeIf(v -> v.getPatchNumber() == version.getPatchNumber());
+        installed.removeIf(v -> v.getPatchNumber() == version.getPatchNumber()
+                && v.getBranch().equals(version.getBranch()));
 
         GameVersion installedVersion = new GameVersion(
                 version.getName(),
@@ -167,8 +213,10 @@ public class VersionManager
                 version.getDownloadUrl(),
                 version.getPatchNumber(),
                 version.getSize(),
-                true
+                true,
+                version.getBranch()
         );
+
         installed.add(installedVersion);
 
         try {
@@ -179,11 +227,9 @@ public class VersionManager
         }
     }
 
-    public boolean isVersionInstalled(int patchNumber)
+    public boolean isVersionInstalled(int patchNumber, String branch)
     {
-        Path gameDir = Environment.getDefaultAppDir()
-                .resolve("release").resolve("package")
-                .resolve("game").resolve("patch-" + patchNumber);
+        Path gameDir = getVersionDirectory(patchNumber, branch);
 
         String clientName = Environment.getOS().equals("windows")
                 ? "HytaleClient.exe" : "HytaleClient";
@@ -192,23 +238,28 @@ public class VersionManager
         return Files.exists(clientPath);
     }
 
-    public Path getVersionDirectory(int patchNumber)
+    public Path getVersionDirectory(int patchNumber, String branch)
     {
+        String dirName = branch.equals("pre-release")
+                ? "patch-pre-" + patchNumber
+                : "patch-" + patchNumber;
+
         return Environment.getDefaultAppDir()
                 .resolve("release").resolve("package")
-                .resolve("game").resolve("patch-" + patchNumber);
+                .resolve("game").resolve(dirName);
     }
 
-    public void deleteVersion(int patchNumber) throws IOException
+    public void deleteVersion(int patchNumber, String branch) throws IOException
     {
-        Path versionDir = getVersionDirectory(patchNumber);
+        Path versionDir = getVersionDirectory(patchNumber, branch);
 
         if (Files.exists(versionDir)) {
             deleteRecursively(versionDir);
         }
 
         List<GameVersion> installed = getInstalledVersions();
-        installed.removeIf(v -> v.getPatchNumber() == patchNumber);
+        installed.removeIf(v -> v.getPatchNumber() == patchNumber
+                && v.getBranch().equals(branch));
 
         String json = gson.toJson(installed);
         Files.writeString(installedVersionsFile, json);
@@ -224,7 +275,7 @@ public class VersionManager
                     try {
                         Files.delete(p);
                     } catch (IOException e) {
-                        System.err.println("Fail to delete: " + p);
+                        System.err.println("Failed to delete: " + p);
                     }
                 });
     }

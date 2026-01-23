@@ -11,8 +11,10 @@ import java.nio.file.*;
 
 import org.apache.commons.compress.archivers.zip.ZipFile;
 
-public class ButlerInstaller {
-    public static Path installButler(ProgressCallback callback) throws Exception {
+public class ButlerInstaller
+{
+    public static Path installButler(ProgressCallback callback) throws Exception
+    {
         Path toolsDir = Environment.getDefaultAppDir().resolve("tools").resolve("butler");
         Files.createDirectories(toolsDir);
 
@@ -24,7 +26,8 @@ public class ButlerInstaller {
             try {
                 Process p = new ProcessBuilder(finalButlerPath.toString(), "--version").start();
                 int exit = p.waitFor();
-                if (exit == 0) {
+                if (exit == 0)
+                {
                     callback.onProgress(new ProgressUpdate("butler", 100, "Butler already installed", "", "", 0, 0));
                     return finalButlerPath;
                 }
@@ -43,23 +46,29 @@ public class ButlerInstaller {
         Files.deleteIfExists(tempZip);
 
         int maxRetries = 3;
-        for (int attempt = 1; attempt <= maxRetries; attempt++) {
+        for (int attempt = 1; attempt <= maxRetries; attempt++)
+        {
             try {
                 downloadFile(url, tempZip, callback);
 
-                try (var zip = new ZipFile(tempZip.toFile())) {
+                try (var zip = new ZipFile(tempZip.toFile()))
+                {
                     System.out.println("ZIP validated OK on attempt " + attempt);
                     break;
-                } catch (Exception e) {
+                } catch (Exception e)
+                {
                     System.err.println("Invalid ZIP on attempt " + attempt + ": " + e);
                     Files.deleteIfExists(tempZip);
+
                     if (attempt == maxRetries) {
                         throw new IOException("Failed to download valid butler ZIP after " + maxRetries + " attempts");
                     }
+
                     Thread.sleep(2000 * attempt);
                     continue;
                 }
-            } catch (Exception e) {
+            } catch (Exception e)
+            {
                 Files.deleteIfExists(tempZip);
                 if (attempt == maxRetries) throw e;
                 Thread.sleep(2000 * attempt);
@@ -99,13 +108,15 @@ public class ButlerInstaller {
         return finalButlerPath;
     }
 
-    private static String getButlerURL() {
+    private static String getButlerURL()
+    {
         String os = Environment.getOS();
         String arch = Environment.getArch();
 
         String baseUrl = "https://broth.itch.zone/butler/";
 
-        return switch (os) {
+        return switch (os)
+        {
             case "windows" -> baseUrl + "windows-" + arch + "/LATEST/archive/default";
             case "darwin" -> baseUrl + "darwin-" + arch + "/LATEST/archive/default";
             case "linux" -> baseUrl + "linux-" + arch + "/LATEST/archive/default";
@@ -113,7 +124,8 @@ public class ButlerInstaller {
         };
     }
 
-    private static void downloadFile(String urlStr, Path dest, ProgressCallback callback) throws Exception {
+    private static void downloadFile(String urlStr, Path dest, ProgressCallback callback) throws Exception
+    {
         URL url = new URL(urlStr);
         HttpURLConnection conn = (HttpURLConnection) url.openConnection();
         conn.setRequestProperty("User-Agent", "Linghy/1.0");
@@ -130,17 +142,19 @@ public class ButlerInstaller {
         long lastUpdate = startTime;
 
         try (InputStream in = conn.getInputStream();
-             OutputStream out = Files.newOutputStream(dest, StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING)) {
-
+             OutputStream out = Files.newOutputStream(dest, StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING))
+        {
             byte[] buffer = new byte[32768];
             int bytesRead;
 
-            while ((bytesRead = in.read(buffer)) != -1) {
+            while ((bytesRead = in.read(buffer)) != -1)
+            {
                 out.write(buffer, 0, bytesRead);
                 downloaded += bytesRead;
 
                 long now = System.currentTimeMillis();
-                if (now - lastUpdate > 200) {
+                if (now - lastUpdate > 200)
+                {
                     double percent = total > 0 ? (downloaded * 100.0 / total) : 0;
                     double elapsed = (now - startTime) / 1000.0;
                     String speed = elapsed > 0 ? String.format("%.2f MB/s", downloaded / 1024.0 / 1024.0 / elapsed) : "";
