@@ -73,4 +73,16 @@ public final class CryptoUtil
 
         return new String(c.doFinal(enc), StandardCharsets.UTF_8);
     }
+
+    public static String readEncryptedBytes(byte[] all) throws Exception
+    {
+        byte[] salt = Arrays.copyOfRange(all, 0, 16);
+        byte[] iv   = Arrays.copyOfRange(all, 16, 32);
+        byte[] enc  = Arrays.copyOfRange(all, 32, all.length);
+
+        Cipher c = Cipher.getInstance("AES/CBC/PKCS5Padding");
+        c.init(Cipher.DECRYPT_MODE, deriveKey(salt), new IvParameterSpec(iv));
+
+        return new String(c.doFinal(enc), StandardCharsets.UTF_8);
+    }
 }

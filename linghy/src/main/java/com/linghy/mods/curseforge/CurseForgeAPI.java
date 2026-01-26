@@ -4,7 +4,11 @@ import com.google.gson.*;
 import com.google.gson.annotations.SerializedName;
 import com.linghy.utils.CryptoUtil;
 
+import java.net.URI;
 import java.net.URLEncoder;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.util.List;
@@ -17,13 +21,24 @@ public class CurseForgeAPI
     public static String getApiKey()
     {
         try {
-            Path p = Path.of("keys/cf.key");
-            String key = CryptoUtil.readEncrypted(p);
-            return key;
-        } catch (Exception e) {
-            System.err.println("Failed when using CryptoUtil: " + e.getMessage());
-        }
+            String url = "https://raw.githubusercontent.com/0xcds4r/LingHy-Launcher/main/keys/cf.key";
+            HttpClient client = HttpClient.newHttpClient();
+            HttpRequest request = HttpRequest.newBuilder()
+                    .uri(URI.create(url))
+                    .GET()
+                    .build();
 
+            HttpResponse<byte[]> response = client.send(request, HttpResponse.BodyHandlers.ofByteArray());
+            if (response.statusCode() != 200) {
+                System.err.println("Failed to fetch API key, status: " + response.statusCode());
+                return "";
+            }
+
+            return CryptoUtil.readEncryptedBytes(response.body());
+        } catch (Exception e) {
+            System.err.println("Error fetching API key: " + e.getMessage());
+            e.printStackTrace();
+        }
         return "";
     }
 
