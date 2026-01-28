@@ -45,17 +45,31 @@ We strongly recommend clearing or renaming the old '~/.hytale/' folder to preven
 Before clearing, make a backup of your saves and mods.
 
 v1.6:
-
-Work in progress, check [Planning](https://github.com/0xcds4r/LingHy-Launcher/wiki/Planning)
+- Added mod manager (BETA): installed mods and curse forge browse
+- Optimize code & bug fix
 
 ### Screenshots:
 
+News & Control:
+
 ![01.png](preview/01.png)
+
+Hytale Latest Release Versions:
 
 ![02.png](preview/02.png)
 
+Hytale Latest Pre-Release Versions:
+
 ![03.png](preview/03.png)
+
+Mod manager:
 
 ![04.png](preview/04.png)
 
+Curse Forge support:
+
 ![05.png](preview/05.png)
+
+Easy to play for free:
+
+![06.png](preview/06.png)
