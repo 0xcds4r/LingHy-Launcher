@@ -1,5 +1,11 @@
 ## LingHy Launcher for Hytale by 0xcds4r
 
+### Download:
+
+[Releases](https://github.com/0xcds4r/LingHy-Launcher/releases/tag/release)
+
+### Change log:
+
 v1.0:
 - Installing and launching the basic version of the game
 - Basic launcher interface with news
