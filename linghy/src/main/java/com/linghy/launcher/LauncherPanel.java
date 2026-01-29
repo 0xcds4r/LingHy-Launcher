@@ -4,6 +4,7 @@ import com.linghy.env.Environment;
 import com.linghy.java.JREDownloader;
 import com.linghy.model.ProgressUpdate;
 import com.linghy.mods.ModManagerDialog;
+import com.linghy.patches.OnlineFix;
 import com.linghy.pwr.GameInstaller;
 
 import javax.imageio.ImageIO;
@@ -54,6 +55,7 @@ public class LauncherPanel extends JPanel
     private JLabel speedLabel;
     private BufferedImage backgroundImage;
     private JButton folderButton;
+    private JButton fixOnlineButton;
 
     private double currentProgress = 0;
     private String currentMessage = "Ready to play";
@@ -863,6 +865,126 @@ public class LauncherPanel extends JPanel
         return button;
     }
 
+    private void applyOnlineFix()
+    {
+        if (selectedVersion == null)
+        {
+            JOptionPane.showMessageDialog(this,
+                    "Select game version first",
+                    "No Version Selected",
+                    JOptionPane.WARNING_MESSAGE);
+            return;
+        }
+
+        int result = JOptionPane.showConfirmDialog(this,
+                "This will patch the HytaleClient binary to fix online mode.\n" +
+                        "A backup will be created automatically.\n\n" +
+                        "Continue?",
+                "Apply Online Fix",
+                JOptionPane.YES_NO_OPTION,
+                JOptionPane.WARNING_MESSAGE);
+
+        if (result != JOptionPane.YES_OPTION) {
+            return;
+        }
+
+        Path gameDir = versionManager.getVersionDirectory(
+                selectedVersion.getPatchNumber(),
+                selectedVersion.getBranch()
+        );
+
+        Path clientDir = gameDir.resolve("Client");
+        Path clientPath = clientDir.resolve("HytaleClient");
+
+        if (!Files.exists(clientPath))
+        {
+            JOptionPane.showMessageDialog(this,
+                    "HytaleClient not found in:\n" + clientPath,
+                    "Client Not Found",
+                    JOptionPane.ERROR_MESSAGE);
+            return;
+        }
+
+        if (fixOnlineButton != null) {
+            fixOnlineButton.setEnabled(false);
+            fixOnlineButton.setText("<html><center>Patching...</center></html>");
+        }
+
+        SwingWorker<OnlineFix.PatchResult, String> worker = new SwingWorker<>()
+        {
+            @Override
+            protected OnlineFix.PatchResult doInBackground() throws Exception
+            {
+                return OnlineFix.applyPatch(clientPath, this::publish);
+            }
+
+            @Override
+            protected void process(java.util.List<String> chunks)
+            {
+                if (!chunks.isEmpty()) {
+                    String message = chunks.get(chunks.size() - 1);
+                    statusLabel.setText(message);
+                }
+            }
+
+            @Override
+            protected void done()
+            {
+                try
+                {
+                    OnlineFix.PatchResult patchResult = get();
+
+                    if (patchResult.success)
+                    {
+                        statusLabel.setText("Online fix applied successfully");
+
+                        JOptionPane.showMessageDialog(
+                                LauncherPanel.this,
+                                "Online fix applied successfully!\n\n" +
+                                        "Backup saved to:\n" +
+                                        (patchResult.backupFile != null ? patchResult.backupFile.toString() : "N/A"),
+                                "Success",
+                                JOptionPane.INFORMATION_MESSAGE
+                        );
+                    }
+                    else
+                    {
+                        statusLabel.setText("Patch failed: " + patchResult.message);
+
+                        JOptionPane.showMessageDialog(
+                                LauncherPanel.this,
+                                "Failed to apply patch:\n" + patchResult.message,
+                                "Patch Failed",
+                                JOptionPane.ERROR_MESSAGE
+                        );
+                    }
+                }
+                catch (Exception e)
+                {
+                    e.printStackTrace();
+                    statusLabel.setText("Error: " + e.getMessage());
+
+                    JOptionPane.showMessageDialog(
+                            LauncherPanel.this,
+                            "Error applying patch:\n" + e.getMessage(),
+                            "Error",
+                            JOptionPane.ERROR_MESSAGE
+                    );
+                }
+                finally
+                {
+                    if (fixOnlineButton != null)
+                    {
+                        fixOnlineButton.setEnabled(true);
+                        fixOnlineButton.setText("<html><center>Fix<br>Online</center></html>");
+                    }
+                }
+            }
+        };
+
+        worker.execute();
+    }
+
     private JPanel createBottomControls()
     {
         JPanel bottom = new JPanel(new BorderLayout());
@@ -923,9 +1045,37 @@ public class LauncherPanel extends JPanel
         modsButton.addActionListener(e -> openModManager());
 
         leftPanel.add(modsButton);
-
         leftPanel.add(versionButton);
         leftPanel.add(folderButton);
+
+        if (Environment.getOS().equals("linux"))
+        {
+            fixOnlineButton = new JButton("<html><center>Fix<br>Online</center></html>");
+            fixOnlineButton.setFont(new Font("Segoe UI", Font.BOLD, 12));
+            fixOnlineButton.setForeground(Color.WHITE);
+            fixOnlineButton.setBackground(new Color(220, 38, 38));
+            fixOnlineButton.setPreferredSize(new Dimension(90, 90));
+            fixOnlineButton.setFocusPainted(false);
+            fixOnlineButton.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+            fixOnlineButton.setToolTipText("Apply online fix patch (Linux only)");
+            fixOnlineButton.addActionListener(e -> applyOnlineFix());
+
+            fixOnlineButton.addMouseListener(new MouseAdapter()
+            {
+                @Override
+                public void mouseEntered(MouseEvent e) {
+                    fixOnlineButton.setBackground(new Color(239, 68, 68));
+                }
+
+                @Override
+                public void mouseExited(MouseEvent e) {
+                    fixOnlineButton.setBackground(new Color(220, 38, 38));
+                }
+            });
+
+            leftPanel.add(fixOnlineButton);
+        }
+
         leftPanel.add(playButton);
 
         bottom.add(leftPanel, BorderLayout.WEST);

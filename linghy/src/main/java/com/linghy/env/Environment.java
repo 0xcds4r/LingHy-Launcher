@@ -71,7 +71,7 @@ public class Environment
                 String implVersion = pkg.getImplementationVersion();
                 String implBuildTime = pkg.getImplementationVendor();
                 if (implVersion != null && !implVersion.isBlank() && implBuildTime != null && !implBuildTime.isBlank()) {
-                    return implVersion.trim() + " build " + implBuildTime.hashCode();
+                    return implVersion.trim() + " build " + -implBuildTime.hashCode();
                 }
             }
         } catch (Exception ignore) {
