@@ -7,18 +7,37 @@ import java.util.Arrays;
 
 public class OnlineFix
 {
-    /*
-     *   Ugh, one fuckin address offset and it'll stop working.
-     *   But so far there seem to be no problems, and the pattern doesn't seem to be changing.
-     * */
-
     private static final long SEARCH_START = 0x800000L;
-    private static final long SEARCH_END = 0x80DB80L + 0x300L;
+    private static final long MAX_SEARCH_SIZE = 50 * 1024 * 1024L;
 
-    private static final byte[] SEARCH_PATTERN = hexToBytes(
-            "55 53 48 83 ec 38 48 8d 6c 24 40 33 c0 48 89 45"
+    ////////////////////////////////////////////////////////////////////
+    // outer big badass chunk-pattern
+    ////////////////////////////////////////////////////////////////////
+    private static final byte[] OUTER_PATTERN = hexToBytes(
+            "1C D0 43 00 48 8B F0 48 85 F6 74 17 48 8D 3D AD " +
+            "5B 47 02 48 39 3E 74 0B 48 8B F0 E8 E0 72 4F 00 " +
+            "48 8B F0 48 8D BB C8 00 00 00 48 85 FF 74 1B 49 " +
+            "8B D6 E8 19 4B 93 FF 49 3B C6 4C 8B F0 75 BA 48 " +
+            "83 C4 08 5B 41 5E 41 5F 5D C3 E8 41 7B 46 00 CC " +
+            "55 53 48 83 EC 38 48 8D 6C 24 40 33 C0 48 89 45 " +
+            "C8 45 0F 57 C0 44 0F 29 45 D0 44 0F 29 45 E0 48 " +
+            "89 45 F0 48 8B DF 48 8D 7D C8 E8 11 9C 03 00 80 " +
+            "7D E0 00 75 1A 48 8B 45 D0 48 85 C0 74 11 8B 40 " +
+            "08 85 C0 74 0A 48 8B 4B 60 83 79 5C 02 74 09 33 " +
+            "C0 48 83 C4 38 5B 5D C3 83 79 58 02 0F 94 C0 0F " +
+            "B6 C0 48 83 C4 38 5B 5D C3 90 90 90 90 90 90 90"
     );
 
+    ////////////////////////////////////////////////////////////////////
+    // actual target
+    ////////////////////////////////////////////////////////////////////
+    private static final byte[] SEARCH_PATTERN = hexToBytes(
+            "55 53 48 83 EC 38 48 8D 6C 24 40 33 C0 48 89 45"
+    );
+
+    ////////////////////////////////////////////////////////////////////
+    // just make a ret, if found
+    ////////////////////////////////////////////////////////////////////
     private static final byte[] REPLACE_PATTERN = hexToBytes(
             "b8 01 00 00 00 c3"
     );
@@ -55,26 +74,27 @@ public class OnlineFix
         try
         {
             if (listener != null) {
-                listener.onProgress("Searching for pattern...");
+                listener.onProgress("Searching for pattern context...");
             }
 
-            long offset = findPattern(targetFile);
+            NestedPatternMatch match = findNestedPattern(targetFile, listener);
 
-            if (offset == -1)
+            if (match == null)
             {
                 restoreBackup(backupFile, targetFile);
-                return new PatchResult(false, "Pattern not found in specified range", backupFile);
+                return new PatchResult(false, "Pattern not found in file", backupFile);
             }
 
             if (listener != null) {
-                listener.onProgress(String.format("Pattern found at 0x%X", offset));
+                listener.onProgress(String.format("Pattern found at 0x%X (context at 0x%X, offset +0x%X)",
+                        match.innerOffset, match.outerOffset, match.innerRelativePos));
             }
 
             if (listener != null) {
                 listener.onProgress("Applying patch...");
             }
 
-            boolean success = applyPatchAtOffset(targetFile, offset);
+            boolean success = applyPatchAtOffset(targetFile, match.innerOffset);
 
             if (!success)
             {
@@ -86,7 +106,7 @@ public class OnlineFix
                 listener.onProgress("Verifying patch...");
             }
 
-            if (!verifyPatch(targetFile, offset))
+            if (!verifyPatch(targetFile, match.innerOffset))
             {
                 restoreBackup(backupFile, targetFile);
                 return new PatchResult(false, "Patch verification failed", backupFile);
@@ -105,40 +125,123 @@ public class OnlineFix
         }
     }
 
-    private static long findPattern(Path file) throws IOException
+    private static class NestedPatternMatch
     {
+        final long outerOffset;
+        final long innerOffset;
+        final int innerRelativePos;
+
+        NestedPatternMatch(long outerOffset, long innerOffset, int innerRelativePos)
+        {
+            this.outerOffset = outerOffset;
+            this.innerOffset = innerOffset;
+            this.innerRelativePos = innerRelativePos;
+        }
+    }
+
+    private static NestedPatternMatch findNestedPattern(Path file, PatchProgressListener listener) throws IOException
+    {
+        long fileSize = Files.size(file);
+        long searchEnd = Math.min(fileSize, SEARCH_START + MAX_SEARCH_SIZE);
+        long searchSize = searchEnd - SEARCH_START;
+
+        if (searchSize <= 0) {
+            return null;
+        }
+
         try (RandomAccessFile raf = new RandomAccessFile(file.toFile(), "r"))
         {
-            long rangeLen = SEARCH_END - SEARCH_START;
-            byte[] buffer = new byte[(int) rangeLen];
+            int bufferSize = (int) Math.min(searchSize, 10 * 1024 * 1024); // 10 MB блоки
+            byte[] buffer = new byte[bufferSize];
 
+            long currentPos = SEARCH_START;
             raf.seek(SEARCH_START);
-            int bytesRead = raf.read(buffer);
 
-            if (bytesRead != rangeLen) {
-                return -1;
-            }
-
-            for (int i = 0; i <= buffer.length - SEARCH_PATTERN.length; i++)
+            while (currentPos < searchEnd)
             {
-                boolean found = true;
+                int toRead = (int) Math.min(bufferSize, searchEnd - currentPos);
+                int bytesRead = raf.read(buffer, 0, toRead);
 
-                for (int j = 0; j < SEARCH_PATTERN.length; j++)
+                if (bytesRead <= 0) {
+                    break;
+                }
+
+                for (int i = 0; i <= bytesRead - OUTER_PATTERN.length; i++)
                 {
-                    if (buffer[i + j] != SEARCH_PATTERN[j])
+                    if (matchesPattern(buffer, i, OUTER_PATTERN))
                     {
-                        found = false;
-                        break;
+                        long outerOffset = currentPos + i;
+
+                        if (listener != null) {
+                            listener.onProgress(String.format("Found context at 0x%X, searching for target...", outerOffset));
+                        }
+
+                        int innerPos = findPatternInArray(buffer, i, OUTER_PATTERN.length, SEARCH_PATTERN);
+
+                        if (innerPos != -1)
+                        {
+                            long innerOffset = currentPos + innerPos;
+                            int relativePos = innerPos - i;
+
+                            if (listener != null) {
+                                listener.onProgress(String.format("Target found at +0x%X from context start", relativePos));
+                            }
+
+                            return new NestedPatternMatch(outerOffset, innerOffset, relativePos);
+                        }
+                        else
+                        {
+                            if (listener != null) {
+                                listener.onProgress("Context found but target pattern missing inside it");
+                            }
+                        }
                     }
                 }
 
-                if (found) {
-                    return SEARCH_START + i;
+                if (listener != null && searchSize > 0)
+                {
+                    int progress = (int) ((currentPos - SEARCH_START) * 100 / searchSize);
+                    if (progress > 0 && progress < 100) {
+                        listener.onProgress(String.format("Scanning... %d%%", progress));
+                    }
                 }
-            }
 
-            return -1;
+                currentPos += bytesRead - OUTER_PATTERN.length + 1;
+                raf.seek(currentPos);
+            }
         }
+
+        return null;
+    }
+
+    private static boolean matchesPattern(byte[] data, int offset, byte[] pattern)
+    {
+        if (offset + pattern.length > data.length) {
+            return false;
+        }
+
+        for (int i = 0; i < pattern.length; i++)
+        {
+            if (data[offset + i] != pattern[i]) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    private static int findPatternInArray(byte[] data, int start, int length, byte[] pattern)
+    {
+        int end = Math.min(start + length, data.length);
+
+        for (int i = start; i <= end - pattern.length; i++)
+        {
+            if (matchesPattern(data, i, pattern)) {
+                return i;
+            }
+        }
+
+        return -1;
     }
 
     private static boolean applyPatchAtOffset(Path file, long offset) throws IOException
