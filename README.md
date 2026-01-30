@@ -54,7 +54,7 @@ v1.6:
 - Added mod manager (BETA): installed mods and curse forge browse
 - Optimize code & bug fix
 
-v1.6.2:
+v1.6.3:
 - Added experimental Online Fix for linux, just click da button
 
 ### Screenshots:
