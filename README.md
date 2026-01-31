@@ -89,3 +89,7 @@ Curse Forge support:
 Easy to play for free:
 
 ![06.png](preview/06.png)
+
+Auto online fix experimental support:
+
+![07.png](preview/07.png)
