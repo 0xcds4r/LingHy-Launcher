@@ -14,7 +14,6 @@ import java.awt.event.*;
 import java.awt.image.BufferedImage;
 import java.io.InputStream;
 import java.net.URI;
-import java.net.URISyntaxException;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.DirectoryStream;
@@ -26,7 +25,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.io.IOException;
 import java.time.format.DateTimeFormatter;
-import java.util.Random;
 import java.util.concurrent.TimeUnit;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -894,7 +892,9 @@ public class LauncherPanel extends JPanel
         );
 
         Path clientDir = gameDir.resolve("Client");
-        Path clientPath = clientDir.resolve("HytaleClient");
+        String clientName = Environment.getOS().equals("windows")
+                ? "HytaleClient.exe" : "HytaleClient";
+        Path clientPath = clientDir.resolve(clientName);
 
         if (!Files.exists(clientPath))
         {
@@ -910,12 +910,21 @@ public class LauncherPanel extends JPanel
             fixOnlineButton.setText("<html><center>Patching...</center></html>");
         }
 
-        SwingWorker<OnlineFix.PatchResult, String> worker = new SwingWorker<>()
+        String os = Environment.getOS();
+
+        SwingWorker<Object, String> worker = new SwingWorker<>()
         {
             @Override
-            protected OnlineFix.PatchResult doInBackground() throws Exception
+            protected Object doInBackground() throws Exception
             {
-                return OnlineFix.applyPatch(clientPath, this::publish);
+                if (os.equals("windows"))
+                {
+                    return com.linghy.patches.OnlineFixWin.applyPatch(clientPath, this::publish);
+                }
+                else
+                {
+                    return OnlineFix.applyPatch(clientPath, this::publish);
+                }
             }
 
             @Override
@@ -932,9 +941,32 @@ public class LauncherPanel extends JPanel
             {
                 try
                 {
-                    OnlineFix.PatchResult patchResult = get();
+                    Object result = get();
+                    boolean success;
+                    String message;
+                    Path backupFile;
 
-                    if (patchResult.success)
+                    if (result instanceof OnlineFix.PatchResult)
+                    {
+                        OnlineFix.PatchResult patchResult = (OnlineFix.PatchResult) result;
+                        success = patchResult.success;
+                        message = patchResult.message;
+                        backupFile = patchResult.backupFile;
+                    }
+                    else if (result instanceof com.linghy.patches.OnlineFixWin.PatchResult)
+                    {
+                        com.linghy.patches.OnlineFixWin.PatchResult patchResult =
+                                (com.linghy.patches.OnlineFixWin.PatchResult) result;
+                        success = patchResult.success;
+                        message = patchResult.message;
+                        backupFile = patchResult.backupFile;
+                    }
+                    else
+                    {
+                        throw new Exception("Unknown patch result type");
+                    }
+
+                    if (success)
                     {
                         statusLabel.setText("Online fix applied successfully");
 
@@ -942,18 +974,18 @@ public class LauncherPanel extends JPanel
                                 LauncherPanel.this,
                                 "Online fix applied successfully!\n\n" +
                                         "Backup saved to:\n" +
-                                        (patchResult.backupFile != null ? patchResult.backupFile.toString() : "N/A"),
+                                        (backupFile != null ? backupFile.toString() : "N/A"),
                                 "Success",
                                 JOptionPane.INFORMATION_MESSAGE
                         );
                     }
                     else
                     {
-                        statusLabel.setText("Patch failed: " + patchResult.message);
+                        statusLabel.setText("Patch failed: " + message);
 
                         JOptionPane.showMessageDialog(
                                 LauncherPanel.this,
-                                "Failed to apply patch:\n" + patchResult.message,
+                                "Failed to apply patch:\n" + message,
                                 "Patch Failed",
                                 JOptionPane.ERROR_MESSAGE
                         );
@@ -1048,33 +1080,30 @@ public class LauncherPanel extends JPanel
         leftPanel.add(versionButton);
         leftPanel.add(folderButton);
 
-        if (Environment.getOS().equals("linux"))
+        fixOnlineButton = new JButton("<html><center>Fix<br>Online</center></html>");
+        fixOnlineButton.setFont(new Font("Segoe UI", Font.BOLD, 12));
+        fixOnlineButton.setForeground(Color.WHITE);
+        fixOnlineButton.setBackground(new Color(220, 38, 38));
+        fixOnlineButton.setPreferredSize(new Dimension(90, 90));
+        fixOnlineButton.setFocusPainted(false);
+        fixOnlineButton.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+        fixOnlineButton.setToolTipText("Experimental function, works only on linux/windows");
+        fixOnlineButton.addActionListener(e -> applyOnlineFix());
+
+        fixOnlineButton.addMouseListener(new MouseAdapter()
         {
-            fixOnlineButton = new JButton("<html><center>Fix<br>Online</center></html>");
-            fixOnlineButton.setFont(new Font("Segoe UI", Font.BOLD, 12));
-            fixOnlineButton.setForeground(Color.WHITE);
-            fixOnlineButton.setBackground(new Color(220, 38, 38));
-            fixOnlineButton.setPreferredSize(new Dimension(90, 90));
-            fixOnlineButton.setFocusPainted(false);
-            fixOnlineButton.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
-            fixOnlineButton.setToolTipText("Apply online fix patch (Linux only)");
-            fixOnlineButton.addActionListener(e -> applyOnlineFix());
+            @Override
+            public void mouseEntered(MouseEvent e) {
+                fixOnlineButton.setBackground(new Color(239, 68, 68));
+            }
 
-            fixOnlineButton.addMouseListener(new MouseAdapter()
-            {
-                @Override
-                public void mouseEntered(MouseEvent e) {
-                    fixOnlineButton.setBackground(new Color(239, 68, 68));
-                }
+            @Override
+            public void mouseExited(MouseEvent e) {
+                fixOnlineButton.setBackground(new Color(220, 38, 38));
+            }
+        });
 
-                @Override
-                public void mouseExited(MouseEvent e) {
-                    fixOnlineButton.setBackground(new Color(220, 38, 38));
-                }
-            });
-
-            leftPanel.add(fixOnlineButton);
-        }
+        leftPanel.add(fixOnlineButton);
 
         leftPanel.add(playButton);
 

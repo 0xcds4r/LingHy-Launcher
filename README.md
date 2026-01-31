@@ -61,6 +61,9 @@ v1.6.4:
 - Hotfix: crash while running on Windows
 - Added exe build for windows
 
+v1.6.5:
+- Added auto online-fix patcher for Windows (Experimental)
+
 ### Screenshots:
 
 News & Control:

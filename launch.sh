@@ -12,7 +12,7 @@ if [ $? -ne 0 ]; then
     exit 1
 fi
 
-JAR_FILE=$(find linghy/target -maxdepth 1 -name "linghy-1.6.4.jar" | head -n 1)
+JAR_FILE=$(find linghy/target -maxdepth 1 -name "linghy-1.6.5.jar" | head -n 1)
 
 if [ -z "$JAR_FILE" ]; then
     echo -e "${RED}Jar-файл не найден!${NC}"
