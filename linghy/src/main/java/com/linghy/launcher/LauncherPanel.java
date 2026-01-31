@@ -1367,28 +1367,62 @@ public class LauncherPanel extends JPanel
             throw new IOException("Client directory not found: " + clientDir);
         }
 
-        String[] candidates = {"HytaleClient", "Hytale", "HytaleClient.bin.x86_64"};
+        String os = Environment.getOS();
+        String[] candidates;
+
+        if (os.equals("windows"))
+        {
+            candidates = new String[]{"HytaleClient.exe"};
+        }
+        else
+        {
+            candidates = new String[]{"HytaleClient", "Hytale", "HytaleClient.bin.x86_64"};
+        }
 
         for (String name : candidates)
         {
             Path candidate = clientDir.resolve(name);
 
-            if (Files.exists(candidate) && Files.isExecutable(candidate)) {
-                return name;
+            if (Files.exists(candidate))
+            {
+                if (os.equals("windows") || Files.isExecutable(candidate)) {
+                    System.out.println("Found game executable: " + name);
+                    return name;
+                }
             }
         }
+
+        System.out.println("Known executables not found, scanning directory...");
 
         try (DirectoryStream<Path> stream = Files.newDirectoryStream(clientDir))
         {
             for (Path entry : stream)
             {
-                if (Files.isRegularFile(entry) && Files.isExecutable(entry)) {
-                    return entry.getFileName().toString();
+                if (!Files.isRegularFile(entry)) {
+                    continue;
+                }
+
+                String fileName = entry.getFileName().toString();
+
+                if (os.equals("windows"))
+                {
+                    if (fileName.toLowerCase().endsWith(".exe")) {
+                        System.out.println("Found .exe file: " + fileName);
+                        return fileName;
+                    }
+                }
+                else
+                {
+                    if (Files.isExecutable(entry))
+                    {
+                        System.out.println("Found executable file: " + fileName);
+                        return fileName;
+                    }
                 }
             }
         }
 
-        throw new IOException("No executable found in Client directory");
+        throw new IOException("No executable found in Client directory: " + clientDir);
     }
 
     private void launchGameFromDirectory(Path gameDir, String playerName) throws Exception

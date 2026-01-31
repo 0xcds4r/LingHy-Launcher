@@ -57,6 +57,10 @@ v1.6:
 v1.6.3:
 - Added experimental Online Fix for linux, just click da button
 
+v1.6.4:
+- Hotfix: crash while running on Windows
+- Added exe build for windows
+
 ### Screenshots:
 
 News & Control:
