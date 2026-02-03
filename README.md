@@ -76,7 +76,7 @@ v1.7:
 
 News & Control:
 
-![01.png](preview/01.png)
+![01.png](https://raw.githubusercontent.com/0xcds4r/LingHy-Launcher/refs/heads/main/preview/01.png)
 
 Hytale Latest Release Versions:
 
@@ -88,7 +88,7 @@ Hytale Latest Pre-Release Versions:
 
 Mod manager:
 
-![04.png](preview/04.png)
+![04.png](https://raw.githubusercontent.com/0xcds4r/LingHy-Launcher/refs/heads/main/preview/04.png)
 
 Curse Forge support:
 
