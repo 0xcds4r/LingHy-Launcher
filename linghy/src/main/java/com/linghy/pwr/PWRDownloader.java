@@ -1,14 +1,11 @@
 package com.linghy.pwr;
 
+import com.linghy.download.DownloadManager;
 import com.linghy.env.Environment;
 import com.linghy.model.ProgressCallback;
 import com.linghy.model.ProgressUpdate;
 
 import java.io.*;
-import java.net.URI;
-import java.net.http.HttpClient;
-import java.net.http.HttpRequest;
-import java.net.http.HttpResponse;
 import java.nio.file.*;
 
 public class PWRDownloader
@@ -20,9 +17,6 @@ public class PWRDownloader
         Files.createDirectories(cacheDir);
 
         Path dest = cacheDir.resolve(fileName);
-        Path tempDest = Paths.get(dest.toString() + ".tmp");
-
-        Files.deleteIfExists(tempDest);
 
         if (Files.exists(dest))
         {
@@ -33,9 +27,25 @@ public class PWRDownloader
         }
 
         System.out.println("Downloading PWR file: " + url);
-        downloadFile(url, tempDest, callback);
 
-        Files.move(tempDest, dest, StandardCopyOption.ATOMIC_MOVE);
+        DownloadManager downloader = new DownloadManager();
+
+        ProgressCallback wrappedCallback = (update) ->
+        {
+            double scaledProgress = update.getProgress() * 0.4;
+
+            callback.onProgress(new ProgressUpdate(
+                    "game",
+                    scaledProgress,
+                    "Downloading game files...",
+                    fileName,
+                    update.getSpeed(),
+                    update.getDownloaded(),
+                    update.getTotal()
+            ));
+        };
+
+        downloader.downloadWithNIO(url, dest, wrappedCallback);
 
         System.out.println("PWR downloaded to: " + dest);
         return dest;
@@ -55,61 +65,5 @@ public class PWRDownloader
                 os, arch, version, fileName);
 
         return downloadPWRFromUrl(url, fileName, callback);
-    }
-
-    private static void downloadFile(String url, Path dest,
-                                     ProgressCallback callback) throws Exception
-    {
-        HttpClient client = HttpClient.newHttpClient();
-        HttpRequest request = HttpRequest.newBuilder()
-                .uri(URI.create(url))
-                .GET()
-                .build();
-
-        HttpResponse<InputStream> response = client.send(request,
-                HttpResponse.BodyHandlers.ofInputStream());
-
-        if (response.statusCode() != 200) {
-            throw new IOException("Server returned HTTP " + response.statusCode());
-        }
-
-        long total = response.headers().firstValueAsLong("Content-Length").orElse(-1);
-        long downloaded = 0;
-        long startTime = System.currentTimeMillis();
-        long lastUpdate = startTime;
-
-        try (InputStream in = response.body();
-             OutputStream out = Files.newOutputStream(dest)) {
-
-            byte[] buffer = new byte[32768];
-            int bytesRead;
-
-            while ((bytesRead = in.read(buffer)) != -1) {
-                out.write(buffer, 0, bytesRead);
-                downloaded += bytesRead;
-
-                long now = System.currentTimeMillis();
-                if (now - lastUpdate > 200) {
-                    if (total > 0) {
-                        double percent = (downloaded * 100.0 / total);
-                        double elapsed = (now - startTime) / 1000.0;
-                        String speed = elapsed > 0
-                                ? String.format("%.2f MB/s", downloaded / 1024.0 / 1024.0 / elapsed)
-                                : "";
-
-                        double overallProgress = percent * 0.4;
-
-                        callback.onProgress(new ProgressUpdate("game", overallProgress,
-                                "Downloading game files...", dest.getFileName().toString(),
-                                speed, downloaded, total));
-
-                        System.out.printf("\r%.1f%% downloaded (%.2f MB/s)",
-                                percent, downloaded / 1024.0 / 1024.0 / elapsed);
-                    }
-                    lastUpdate = now;
-                }
-            }
-        }
-        System.out.println();
     }
 }

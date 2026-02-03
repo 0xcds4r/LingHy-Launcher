@@ -1,6 +1,7 @@
 package com.linghy.java;
 
 import com.google.gson.Gson;
+import com.linghy.download.DownloadManager;
 import com.linghy.env.Environment;
 import com.linghy.model.JREManifest;
 import com.linghy.model.ProgressCallback;
@@ -12,8 +13,6 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.file.*;
-import java.security.MessageDigest;
-import java.util.HexFormat;
 
 public class JREDownloader
 {
@@ -60,9 +59,6 @@ public class JREDownloader
         String fileName = Paths.get(URI.create(platform.getUrl()).getPath())
                 .getFileName().toString();
         Path cacheFile = cacheDir.resolve(fileName);
-        Path tempFile = Paths.get(cacheFile.toString() + ".tmp");
-
-        Files.deleteIfExists(tempFile);
 
         if (!Files.exists(cacheFile))
         {
@@ -70,18 +66,40 @@ public class JREDownloader
             callback.onProgress(new ProgressUpdate("jre", 0,
                     "Downloading JRE...", fileName, "", 0, 0));
 
-            downloadFile(platform.getUrl(), tempFile, callback, fileName);
-            Files.move(tempFile, cacheFile, StandardCopyOption.ATOMIC_MOVE);
+            DownloadManager downloader = new DownloadManager();
+
+            ProgressCallback wrappedCallback = (update) ->
+            {
+                callback.onProgress(new ProgressUpdate(
+                        "jre",
+                        update.getProgress(),
+                        "Downloading JRE...",
+                        fileName,
+                        update.getSpeed(),
+                        update.getDownloaded(),
+                        update.getTotal()
+                ));
+            };
+
+            downloader.downloadWithHttpClient(
+                    platform.getUrl(),
+                    cacheFile,
+                    platform.getSha256(),
+                    wrappedCallback
+            );
         }
-
-        System.out.println("Verifying JRE...");
-        callback.onProgress(new ProgressUpdate("jre", 90,
-                "Verifying JRE...", fileName, "", 0, 0));
-
-        if (!verifySHA256(cacheFile, platform.getSha256()))
+        else
         {
-            Files.deleteIfExists(cacheFile);
-            throw new Exception("SHA256 verification failed");
+            System.out.println("JRE already cached, verifying...");
+            callback.onProgress(new ProgressUpdate("jre", 90,
+                    "Verifying JRE...", fileName, "", 0, 0));
+
+            DownloadManager downloader = new DownloadManager();
+            if (!downloader.verifySHA256(cacheFile, platform.getSha256()))
+            {
+                Files.deleteIfExists(cacheFile);
+                throw new Exception("Cached JRE failed SHA256 verification, re-download required");
+            }
         }
 
         System.out.println("Extracting JRE...");
@@ -103,69 +121,6 @@ public class JREDownloader
         System.out.println("JRE installed successfully");
         callback.onProgress(new ProgressUpdate("jre", 100,
                 "JRE installed", "", "", 0, 0));
-    }
-
-    private static void downloadFile(String url, Path dest,
-                                     ProgressCallback callback, String fileName) throws Exception
-    {
-        HttpClient client = HttpClient.newHttpClient();
-        HttpRequest request = HttpRequest.newBuilder()
-                .uri(URI.create(url))
-                .GET()
-                .build();
-
-        HttpResponse<InputStream> response = client.send(request,
-                HttpResponse.BodyHandlers.ofInputStream());
-
-        long total = response.headers().firstValueAsLong("Content-Length").orElse(-1);
-        long downloaded = 0;
-        long startTime = System.currentTimeMillis();
-        long lastUpdate = startTime;
-
-        try (InputStream in = response.body();
-             OutputStream out = Files.newOutputStream(dest))
-        {
-            byte[] buffer = new byte[8192];
-            int bytesRead;
-
-            while ((bytesRead = in.read(buffer)) != -1)
-            {
-                out.write(buffer, 0, bytesRead);
-                downloaded += bytesRead;
-
-                long now = System.currentTimeMillis();
-
-                if (now - lastUpdate > 200)
-                {
-                    double percent = total > 0 ? (downloaded * 100.0 / total) : 0;
-                    double elapsed = (now - startTime) / 1000.0;
-                    String speed = elapsed > 0
-                            ? String.format("%.2f MB/s", downloaded / 1024.0 / 1024.0 / elapsed)
-                            : "";
-
-                    callback.onProgress(new ProgressUpdate("jre", percent,
-                            "Downloading JRE...", fileName, speed, downloaded, total));
-
-                    lastUpdate = now;
-                }
-            }
-        }
-    }
-
-    private static boolean verifySHA256(Path file, String expected) throws Exception
-    {
-        MessageDigest digest = MessageDigest.getInstance("SHA-256");
-        try (InputStream in = Files.newInputStream(file))
-        {
-            byte[] buffer = new byte[8192];
-            int bytesRead;
-            while ((bytesRead = in.read(buffer)) != -1) {
-                digest.update(buffer, 0, bytesRead);
-            }
-        }
-
-        String calculated = HexFormat.of().formatHex(digest.digest());
-        return calculated.equalsIgnoreCase(expected);
     }
 
     private static boolean isJREInstalled(Path jreDir)

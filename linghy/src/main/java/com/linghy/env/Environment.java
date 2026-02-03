@@ -65,17 +65,23 @@ public class Environment
     {
         String version = "unknown";
 
-        try {
+        try
+        {
             Package pkg = Main.class.getPackage();
-            if (pkg != null) {
+
+            if (pkg != null)
+            {
                 String implVersion = pkg.getImplementationVersion();
                 String implBuildTime = pkg.getImplementationVendor();
-                if (implVersion != null && !implVersion.isBlank() && implBuildTime != null && !implBuildTime.isBlank()) {
-                    return implVersion.trim() + " build " + implBuildTime.hashCode();
+
+                if (implVersion != null && !implVersion.isBlank() && implBuildTime != null && !implBuildTime.isBlank())
+                {
+                    long positiveHash = (long) implBuildTime.hashCode() & 0xFFFFFFFFL;
+                    return implVersion.trim() + " (build " + positiveHash + ")";
                 }
             }
         } catch (Exception ignore) {
-
+            // ...
         }
 
         return version;

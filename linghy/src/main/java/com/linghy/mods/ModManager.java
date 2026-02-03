@@ -1,17 +1,13 @@
 package com.linghy.mods;
 
 import com.google.gson.Gson;
+import com.linghy.download.DownloadManager;
 import com.linghy.env.Environment;
 import com.linghy.mods.curseforge.CurseForgeAPI;
 import com.linghy.mods.manifest.ModManifest;
 
 import java.io.IOException;
 import java.io.InputStream;
-import java.net.HttpURLConnection;
-import java.net.URL;
-import java.nio.channels.Channels;
-import java.nio.channels.FileChannel;
-import java.nio.channels.ReadableByteChannel;
 import java.nio.file.*;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
@@ -39,6 +35,10 @@ public class ModManager
         } catch (IOException e) {
             System.err.println("Failed to create mod directories: " + e.getMessage());
         }
+    }
+
+    public Path getModsDir() {
+        return this.modsDir;
     }
 
     public CompletableFuture<List<InstalledMod>> getInstalledModsAsync()
@@ -172,130 +172,88 @@ public class ModManager
         downloadAndInstall(file, 0, null, listener);
     }
 
-    public void downloadAndInstall(CurseForgeAPI.ModFile file, int curseForgeId, String iconUrl, ModProgressListener listener) throws IOException
+    public void downloadAndInstall(CurseForgeAPI.ModFile file, int curseForgeId,
+                                   String iconUrl, ModProgressListener listener) throws IOException
     {
         String fileName = file.fileName;
         Path outPath = modsDir.resolve(fileName);
 
+        System.out.println("=== Mod Download Start ===");
+        System.out.println("File: " + fileName);
+        System.out.println("URL: " + file.downloadUrl);
+        System.out.println("Target: " + outPath);
+
         if (listener != null) {
-            listener.onProgress(0, "Starting...");
+            listener.onProgress(0, "Initializing download...");
         }
 
-        int maxRetries = 3;
-        IOException lastException = null;
-
-        for (int attempt = 1; attempt <= maxRetries; attempt++)
+        try
         {
-            try {
-                if (attempt > 1)
-                {
-                    if (listener != null) {
-                        listener.onProgress(0, "Retry " + attempt + "...");
-                    }
+            DownloadManager downloader = new DownloadManager(
+                    65536,
+                    5,
+                    3000
+            );
 
-                    Thread.sleep(2000 * attempt);
-                }
-
-                URL url = new URL(file.downloadUrl);
-                HttpURLConnection connection = (HttpURLConnection) url.openConnection();
-                connection.setRequestProperty("User-Agent", "Mozilla/5.0");
-                connection.setInstanceFollowRedirects(true);
-                connection.setConnectTimeout(60000);
-                connection.setReadTimeout(60000);
-
-                int responseCode = connection.getResponseCode();
-
-                int redirectCount = 0;
-                while ((responseCode == 301 || responseCode == 302 || responseCode == 303) && redirectCount < 5)
-                {
-                    String newUrl = connection.getHeaderField("Location");
-                    connection.disconnect();
-                    connection = (HttpURLConnection) new URL(newUrl).openConnection();
-                    connection.setRequestProperty("User-Agent", "Mozilla/5.0");
-                    connection.setInstanceFollowRedirects(true);
-                    connection.setConnectTimeout(60000);
-                    connection.setReadTimeout(60000);
-                    responseCode = connection.getResponseCode();
-                    redirectCount++;
-                }
-
-                if (responseCode != 200)
-                {
-                    throw new IOException("HTTP " + responseCode);
-                }
-
-                long contentLength = connection.getContentLengthLong();
-
-                try (ReadableByteChannel rbc = Channels.newChannel(connection.getInputStream());
-                     FileChannel fc = FileChannel.open(outPath,
-                             StandardOpenOption.CREATE,
-                             StandardOpenOption.WRITE,
-                             StandardOpenOption.TRUNCATE_EXISTING))
-                {
-                    long totalRead = 0;
-                    long startTime = System.currentTimeMillis();
-                    long lastUpdate = startTime;
-                    long chunkSize = 1024 * 1024;
-
-                    while (totalRead < contentLength || contentLength <= 0)
-                    {
-                        long transferred = fc.transferFrom(rbc, totalRead, chunkSize);
-                        if (transferred <= 0) break;
-
-                        totalRead += transferred;
-
-                        long now = System.currentTimeMillis();
-                        if (listener != null && (now - lastUpdate > 16))
-                        {
-                            double percent = contentLength > 0 ? (totalRead * 100.0) / contentLength : 0;
-                            double elapsed = (now - startTime) / 1000.0;
-                            double speed = elapsed > 0 ? (totalRead / 1024.0 / 1024.0) / elapsed : 0;
-
-                            listener.onProgress(percent, String.format("%.1f MB/s", speed));
-                            lastUpdate = now;
-                        }
-                    }
-
-                    if (contentLength > 0 && totalRead != contentLength)
-                    {
-                        throw new IOException("Incomplete");
-                    }
-                }
-
-                connection.disconnect();
-
+            com.linghy.model.ProgressCallback callback = (update) ->
+            {
                 if (listener != null) {
-                    listener.onProgress(100, "Done");
+                    double percent = update.getProgress();
+                    String speed = update.getSpeed();
+                    String message = speed.isEmpty() ? "Downloading..." : speed;
+
+                    if (percent % 10 < 1) {
+                        System.out.println(String.format("Progress: %.1f%% - %s", percent, message));
+                    }
+
+                    listener.onProgress(percent, message);
                 }
+            };
 
-                if (curseForgeId > 0)
-                {
-                    Path metaFile = outPath.resolveSibling(fileName + ".cfmeta");
-                    String metaJson = gson.toJson(new ModMetadata(curseForgeId, file.id, iconUrl));
-                    Files.writeString(metaFile, metaJson);
-                }
+            System.out.println("Starting download with HttpClient...");
+            String targetUrl = file.downloadUrl;
+//                    .replace("edge.forgecdn.net", "mediafilez.forgecdn.net");
 
-                manifestCache.remove(outPath.toString());
-                return;
+            downloader.downloadWithNIO(targetUrl, outPath, callback);
 
-            } catch (IOException e)
-            {
-                lastException = e;
+            System.out.println("Download completed successfully");
 
-                try {
-                    Files.deleteIfExists(outPath);
-                } catch (IOException ex) {}
-
-                if (attempt == maxRetries) break;
-
-            } catch (InterruptedException e)
-            {
-                Thread.currentThread().interrupt();
-                throw new IOException("Interrupted", e);
+            if (listener != null) {
+                listener.onProgress(100, "Installing...");
             }
-        }
 
-        throw new IOException("Failed after " + maxRetries + " attempts", lastException);
+            if (curseForgeId > 0)
+            {
+                Path metaFile = outPath.resolveSibling(fileName + ".cfmeta");
+                String metaJson = gson.toJson(new ModMetadata(curseForgeId, file.id, iconUrl));
+                Files.writeString(metaFile, metaJson);
+                System.out.println("Metadata saved");
+            }
+
+            manifestCache.remove(outPath.toString());
+
+            if (listener != null) {
+                listener.onProgress(100, "Done");
+            }
+
+            System.out.println("=== Mod Download Complete ===");
+        }
+        catch (Exception e)
+        {
+            System.err.println("=== Mod Download Failed ===");
+            System.err.println("Error: " + e.getClass().getSimpleName());
+            System.err.println("Message: " + e.getMessage());
+            e.printStackTrace();
+
+            try {
+                Files.deleteIfExists(outPath);
+                System.out.println("Cleaned up incomplete file");
+            } catch (IOException ex) {
+                System.err.println("Failed to delete incomplete file: " + ex.getMessage());
+            }
+
+            throw new IOException("Failed to download mod '" + fileName + "': " + e.getMessage(), e);
+        }
     }
 
     private static class ModMetadata

@@ -6,8 +6,16 @@ import javax.swing.*;
 import javax.swing.Timer;
 import javax.swing.border.EmptyBorder;
 import java.awt.*;
+import java.awt.datatransfer.DataFlavor;
+import java.awt.datatransfer.Transferable;
+import java.awt.dnd.*;
 import java.awt.event.*;
+import java.io.File;
+import java.io.IOException;
 import java.net.URL;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
 import java.util.*;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
@@ -26,7 +34,6 @@ public class ModManagerDialog extends JDialog
 
     private JLabel statusLabel;
 
-    // CurseForge panel components
     private JTextField cfSearchField;
     private DefaultListModel<CurseForgeAPI.Mod> cfModel;
     private JList<CurseForgeAPI.Mod> cfList;
@@ -86,6 +93,95 @@ public class ModManagerDialog extends JDialog
 
         setContentPane(mainPanel);
         addWindowDragListener();
+    }
+
+    private void importJarFiles(List<File> files)
+    {
+        List<String> imported = new ArrayList<>();
+        List<String> skipped = new ArrayList<>();
+        List<String> failed = new ArrayList<>();
+
+        Path modsDir = modManager.getModsDir();
+
+        for (File file : files)
+        {
+            if (!file.isFile() || !file.getName().toLowerCase().endsWith(".jar"))
+            {
+                skipped.add(file.getName());
+                continue;
+            }
+
+            Path source = file.toPath();
+            Path target = modsDir.resolve(file.getName());
+
+            try
+            {
+                if (Files.exists(target))
+                {
+                    int choice = JOptionPane.showConfirmDialog(
+                            this,
+                            "Mod \"" + file.getName() + "\" already exists.\nReplace?",
+                            "File exists",
+                            JOptionPane.YES_NO_OPTION,
+                            JOptionPane.QUESTION_MESSAGE
+                    );
+
+                    if (choice != JOptionPane.YES_OPTION)
+                    {
+                        skipped.add(file.getName());
+                        continue;
+                    }
+                }
+
+                Files.copy(source, target, StandardCopyOption.REPLACE_EXISTING);
+                imported.add(file.getName());
+            }
+            catch (IOException e)
+            {
+                System.err.println("Failed to copy mod: " + file.getName() + " → " + e.getMessage());
+                failed.add(file.getName());
+            }
+        }
+
+        if (!imported.isEmpty())
+        {
+            loadInstalledMods();
+            statusLabel.setText("Imported " + imported.size() + " mod(s)");
+        }
+
+        if (!skipped.isEmpty() || !failed.isEmpty())
+        {
+            StringBuilder msg = new StringBuilder();
+            if (!imported.isEmpty())   msg.append("Imported: ").append(imported.size()).append("\n");
+            if (!skipped.isEmpty())    msg.append("Skipped: ").append(skipped.size()).append("\n");
+            if (!failed.isEmpty())     msg.append("Failed: ").append(failed.size()).append("\n\n");
+
+            if (!failed.isEmpty())
+            {
+                msg.append("Failed files:\n").append(String.join("\n", failed));
+            }
+
+            JOptionPane.showMessageDialog(this,
+                    msg.toString().trim(),
+                    "Import Results",
+                    failed.isEmpty() ? JOptionPane.INFORMATION_MESSAGE : JOptionPane.WARNING_MESSAGE);
+        }
+    }
+
+    private void importJarFileViaChooser()
+    {
+        JFileChooser chooser = new JFileChooser();
+        chooser.setDialogTitle("Select mod .jar file(s)");
+        chooser.setMultiSelectionEnabled(true);
+        chooser.setFileFilter(new javax.swing.filechooser.FileNameExtensionFilter("Hytale Mod (*.jar)", "jar"));
+
+        if (chooser.showOpenDialog(this) == JFileChooser.APPROVE_OPTION)
+        {
+            File[] selectedFiles = chooser.getSelectedFiles();
+            if (selectedFiles == null || selectedFiles.length == 0) return;
+
+            importJarFiles(Arrays.asList(selectedFiles));
+        }
     }
 
     private JPanel createCurseForgePanel()
@@ -837,20 +933,30 @@ public class ModManagerDialog extends JDialog
         panel.setBackground(new Color(18, 18, 18));
         panel.setBorder(new EmptyBorder(15, 15, 15, 15));
 
+        JPanel topPanel = new JPanel(new BorderLayout(10, 0));
+        topPanel.setOpaque(false);
+
         JTextField installedSearch = new JTextField();
         installedSearch.setBackground(new Color(26, 26, 32));
         installedSearch.setForeground(Color.WHITE);
         installedSearch.setCaretColor(new Color(255, 168, 69));
         installedSearch.setFont(new Font("Segoe UI", Font.PLAIN, 14));
-
         installedSearch.setBorder(BorderFactory.createCompoundBorder(
                 BorderFactory.createLineBorder(new Color(255, 168, 69, 60), 1),
                 new EmptyBorder(10, 15, 10, 15)
         ));
-
         installedSearch.setToolTipText("Filter installed mods");
 
-        panel.add(installedSearch, BorderLayout.NORTH);
+        JButton importButton = createStyledButton("Import JAR");
+        importButton.setBackground(new Color(59, 130, 246, 180));
+        importButton.setPreferredSize(new Dimension(130, 38));
+        importButton.setToolTipText("Import .jar mod file(s) from your computer");
+        importButton.addActionListener(e -> importJarFileViaChooser());
+
+        topPanel.add(installedSearch, BorderLayout.CENTER);
+        topPanel.add(importButton, BorderLayout.EAST);
+
+        panel.add(topPanel, BorderLayout.NORTH);
 
         installedModel = new DefaultListModel<>();
         installedList = new JList<>(installedModel);
@@ -861,28 +967,26 @@ public class ModManagerDialog extends JDialog
         installedList.setSelectionMode(ListSelectionModel.MULTIPLE_INTERVAL_SELECTION);
         installedList.setFixedCellHeight(70);
 
-        installedList.addListSelectionListener(e ->
-        {
+        ModDropTargetListener dropListener = new ModDropTargetListener();
+        installedList.setDropTarget(new DropTarget(installedList, dropListener));
+
+        installedList.addListSelectionListener(e -> {
             if (!e.getValueIsAdjusting()) {
                 updateButtonStates();
             }
         });
 
-        installedSearch.addKeyListener(new KeyAdapter()
-        {
+        installedSearch.addKeyListener(new KeyAdapter() {
             @Override
-            public void keyReleased(KeyEvent e)
-            {
+            public void keyReleased(KeyEvent e) {
                 String filter = installedSearch.getText().toLowerCase().trim();
                 installedModel.clear();
 
                 List<ModManager.InstalledMod> allMods = modManager.getInstalledMods();
-                for (ModManager.InstalledMod mod : allMods)
-                {
+                for (ModManager.InstalledMod mod : allMods) {
                     if (filter.isEmpty() ||
                             mod.name.toLowerCase().contains(filter) ||
-                            mod.author.toLowerCase().contains(filter))
-                    {
+                            mod.author.toLowerCase().contains(filter)) {
                         installedModel.addElement(mod);
                     }
                 }
@@ -896,7 +1000,19 @@ public class ModManagerDialog extends JDialog
         scrollPane.getViewport().setBackground(new Color(26, 26, 32));
         customizeScrollBar(scrollPane);
 
+        scrollPane.setDropTarget(new DropTarget(scrollPane, dropListener));
+
         panel.add(scrollPane, BorderLayout.CENTER);
+
+        JLabel dragHintLabel = new JLabel(
+                "Drag & drop .jar files here or use «Import JAR» button",
+                SwingConstants.CENTER
+        );
+        dragHintLabel.setFont(new Font("Segoe UI", Font.ITALIC, 12));
+        dragHintLabel.setForeground(new Color(140, 140, 160));
+        dragHintLabel.setBorder(new EmptyBorder(8, 0, 12, 0));
+
+        panel.add(dragHintLabel, BorderLayout.SOUTH);
 
         return panel;
     }
@@ -1366,6 +1482,61 @@ public class ModManagerDialog extends JDialog
                     .replace("<", "&lt;")
                     .replace(">", "&gt;")
                     .replace("\"", "&quot;");
+        }
+    }
+
+    private class ModDropTargetListener extends DropTargetAdapter
+    {
+        @SuppressWarnings("unchecked")
+        @Override
+        public void drop(DropTargetDropEvent dtde)
+        {
+            try
+            {
+                dtde.acceptDrop(DnDConstants.ACTION_COPY);
+
+                Transferable t = dtde.getTransferable();
+                if (t.isDataFlavorSupported(DataFlavor.javaFileListFlavor))
+                {
+                    List<File> files = (List<File>) t.getTransferData(DataFlavor.javaFileListFlavor);
+                    importJarFiles(files);
+                }
+                else
+                {
+                    dtde.dropComplete(false);
+                }
+            }
+            catch (Exception e)
+            {
+                e.printStackTrace();
+                dtde.dropComplete(false);
+            }
+        }
+
+        @Override
+        public void dragEnter(DropTargetDragEvent dtde)
+        {
+            if (dtde.isDataFlavorSupported(DataFlavor.javaFileListFlavor))
+            {
+                dtde.acceptDrag(DnDConstants.ACTION_COPY);
+            }
+            else
+            {
+                dtde.rejectDrag();
+            }
+        }
+
+        @Override
+        public void dragOver(DropTargetDragEvent dtde)
+        {
+            if (dtde.isDataFlavorSupported(DataFlavor.javaFileListFlavor))
+            {
+                dtde.acceptDrag(DnDConstants.ACTION_COPY);
+            }
+            else
+            {
+                dtde.rejectDrag();
+            }
         }
     }
 

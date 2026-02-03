@@ -13,6 +13,7 @@ import java.awt.*;
 import java.awt.event.*;
 import java.awt.image.BufferedImage;
 import java.io.InputStream;
+import java.lang.ref.SoftReference;
 import java.net.URI;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
@@ -25,6 +26,8 @@ import java.util.ArrayList;
 import java.util.List;
 import java.io.IOException;
 import java.time.format.DateTimeFormatter;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -63,6 +66,8 @@ public class LauncherPanel extends JPanel
 
     private VersionManager versionManager;
     private GameVersion selectedVersion;
+
+    private static final Map<String, SoftReference<ImageIcon>> imageCache = new ConcurrentHashMap<>();
 
     public LauncherPanel(JFrame parent)
     {
@@ -164,7 +169,7 @@ public class LauncherPanel extends JPanel
     {
         add(createTitleBar(), BorderLayout.NORTH);
 
-        JPanel centerPanel = new JPanel(new BorderLayout(20, 20));
+        JPanel centerPanel = new JPanel(new BorderLayout(0, 0));
         centerPanel.setOpaque(false);
         centerPanel.setBorder(BorderFactory.createEmptyBorder(40, 40, 40, 40));
 
@@ -205,7 +210,8 @@ public class LauncherPanel extends JPanel
                 return createZeroButton();
             }
 
-            private JButton createZeroButton() {
+            private JButton createZeroButton()
+            {
                 JButton button = new JButton();
                 button.setPreferredSize(new Dimension(0, 0));
                 button.setMinimumSize(new Dimension(0, 0));
@@ -234,7 +240,7 @@ public class LauncherPanel extends JPanel
             }
         });
 
-        scrollPane.getVerticalScrollBar().setPreferredSize(new Dimension(10, 0));
+        scrollPane.getVerticalScrollBar().setPreferredSize(new Dimension(0, 0));
         scrollPane.setHorizontalScrollBarPolicy(JScrollPane.HORIZONTAL_SCROLLBAR_NEVER);
 
         centerPanel.add(scrollPane, BorderLayout.CENTER);
@@ -282,66 +288,184 @@ public class LauncherPanel extends JPanel
         JPanel panel = new JPanel();
         panel.setLayout(new BoxLayout(panel, BoxLayout.Y_AXIS));
         panel.setOpaque(false);
-        panel.setBorder(BorderFactory.createEmptyBorder(12, 0, 16, 0));
+        panel.setBorder(BorderFactory.createEmptyBorder(32, 20, 40, 20));
 
-        JLabel label = new JLabel("Enter username");
-        label.setForeground(new Color(160, 160, 170));
-        label.setFont(new Font("Segoe UI", Font.PLAIN, 13));
-        label.setAlignmentX(Component.CENTER_ALIGNMENT);
-        label.setBorder(BorderFactory.createEmptyBorder(0, 0, 4, 0));
+        JLabel titleLabel = new JLabel("LingHy Launcher");
+        titleLabel.setFont(new Font("Segoe UI", Font.BOLD, 22));
+        titleLabel.setForeground(new Color(245, 245, 255));
+        titleLabel.setAlignmentX(Component.CENTER_ALIGNMENT);
+        titleLabel.setBorder(BorderFactory.createEmptyBorder(0, 0, 8, 0));
+
+        JLabel hintLabel = new JLabel("Enter username — max 16 characters");
+        hintLabel.setFont(new Font("Segoe UI", Font.PLAIN, 13));
+        hintLabel.setForeground(new Color(175, 180, 190));
+        hintLabel.setAlignmentX(Component.CENTER_ALIGNMENT);
+        hintLabel.setBorder(BorderFactory.createEmptyBorder(0, 0, 20, 0));
 
         usernameField = new RoundTextField("");
-        usernameField.setFont(new Font("Segoe UI", Font.BOLD, 17));
+        usernameField.setFont(new Font("Segoe UI", Font.BOLD, 18));
         usernameField.setForeground(Color.WHITE);
-        usernameField.setBackground(new Color(26, 26, 32));
+        usernameField.setBackground(new Color(32, 32, 42, 240));
         usernameField.setCaretColor(new Color(255, 168, 69));
-        usernameField.setSelectionColor(new Color(255, 168, 69, 140));
-        usernameField.setSelectedTextColor(Color.BLACK);
-        usernameField.setBorder(BorderFactory.createEmptyBorder(6, 12, 6, 12));
-        usernameField.setPreferredSize(new Dimension(280, 32));
-        usernameField.setMaximumSize(new Dimension(340, 32));
+        usernameField.setSelectionColor(new Color(255, 168, 69, 80));
+        usernameField.setSelectedTextColor(new Color(20, 20, 25));
 
-        usernameField.addActionListener(e ->
-        {
-            saveUsername();
-            usernameField.transferFocus();
-        });
+        usernameField.setBorder(BorderFactory.createCompoundBorder(
+                BorderFactory.createLineBorder(new Color(60, 60, 75), 1, true),
+                BorderFactory.createEmptyBorder(14, 20, 14, 20)
+        ));
+
+        usernameField.setPreferredSize(new Dimension(360, 56));
+        usernameField.setMaximumSize(new Dimension(420, 56));
+        usernameField.setMinimumSize(new Dimension(320, 56));
 
         usernameField.addFocusListener(new FocusAdapter()
         {
-            @Override
-            public void focusGained(FocusEvent e) {
-                usernameField.setBorder(BorderFactory.createLineBorder(new Color(255, 168, 69, 160), 1));
+            @Override public void focusGained(FocusEvent e)
+            {
+                usernameField.setBorder(BorderFactory.createCompoundBorder(
+                        BorderFactory.createLineBorder(new Color(255, 168, 69, 240), 2, true),
+                        BorderFactory.createEmptyBorder(13, 19, 13, 19)
+                ));
             }
 
-            @Override
-            public void focusLost(FocusEvent e)
+            @Override public void focusLost(FocusEvent e)
             {
-                usernameField.setBorder(BorderFactory.createEmptyBorder(6, 12, 6, 12));
+                usernameField.setBorder(BorderFactory.createCompoundBorder(
+                        BorderFactory.createLineBorder(new Color(60, 60, 75), 1, true),
+                        BorderFactory.createEmptyBorder(14, 20, 14, 20)
+                ));
                 saveUsername();
                 usernameField.setCaretPosition(usernameField.getText().length());
             }
         });
 
-        panel.add(label);
+        usernameField.addMouseListener(new MouseAdapter()
+        {
+            @Override public void mouseEntered(MouseEvent e)
+            {
+                if (!usernameField.hasFocus())
+                {
+                    usernameField.setBorder(BorderFactory.createCompoundBorder(
+                            BorderFactory.createLineBorder(new Color(255, 168, 69, 140), 1, true),
+                            BorderFactory.createEmptyBorder(14, 20, 14, 20)
+                    ));
+                }
+            }
+
+            @Override public void mouseExited(MouseEvent e)
+            {
+                if (!usernameField.hasFocus())
+                {
+                    usernameField.setBorder(BorderFactory.createCompoundBorder(
+                            BorderFactory.createLineBorder(new Color(60, 60, 75), 1, true),
+                            BorderFactory.createEmptyBorder(14, 20, 14, 20)
+                    ));
+                }
+            }
+        });
+
+        usernameField.addActionListener(e -> {
+            saveUsername();
+            usernameField.transferFocus();
+        });
+
+        JPanel footerPanel = new JPanel();
+        footerPanel.setLayout(new BoxLayout(footerPanel, BoxLayout.Y_AXIS));
+        footerPanel.setOpaque(false);
+        footerPanel.setBorder(BorderFactory.createEmptyBorder(24, 0, 0, 0));
+
+        JPanel infoPanel = new JPanel(new FlowLayout(FlowLayout.CENTER, 0, 0));
+        infoPanel.setOpaque(false);
+
+        JLabel versionLabel = new JLabel("v" + Environment.getVersion());
+        versionLabel.setFont(new Font("Segoe UI", Font.PLAIN, 11));
+        versionLabel.setForeground(new Color(140, 145, 160));
+
+        JLabel separator = new JLabel(" — by ");
+        separator.setFont(new Font("Segoe UI", Font.PLAIN, 11));
+        separator.setForeground(new Color(140, 145, 160));
+
+        JLabel authorLabel = new JLabel("0xcds4r");
+        authorLabel.setFont(new Font("Segoe UI", Font.PLAIN, 11));
+        authorLabel.setForeground(Color.YELLOW);
+        authorLabel.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+        authorLabel.addMouseListener(new MouseAdapter()
+        {
+            @Override public void mouseClicked(MouseEvent e)
+            {
+                if (Desktop.isDesktopSupported())
+                {
+                    try {
+                        Desktop.getDesktop().browse(new URI("https://github.com/0xcds4r?from=linghy"));
+                    } catch (Exception ignored) {}
+                }
+            }
+        });
+
+        infoPanel.add(versionLabel);
+        infoPanel.add(separator);
+        infoPanel.add(authorLabel);
+
+        Font playFont = new Font("Segoe UI", Font.BOLD, 16);
+        Dimension btnSize = new Dimension(180, 45);
+        Font btnFont = new Font("Segoe UI", Font.BOLD, 15);
+
+        playButton = createStyledButton("PLAY", new Color(255, 168, 69), btnSize, playFont);
+        playButton.setForeground(new Color(30, 30, 35));
+        playButton.addActionListener(e -> handlePlay());
+
+        JButton modsButton = createStyledButton("Mods", new Color(90, 70, 140), btnSize, btnFont);
+        modsButton.addActionListener(e -> openModManager());
+
+        JButton versionButton = createStyledButton("Versions", new Color(70, 70, 85), btnSize, btnFont);
+        versionButton.addActionListener(e -> openVersionSelector());
+
+        folderButton = createStyledButton("Folder", new Color(70, 70, 85), btnSize, btnFont);
+        folderButton.addActionListener(e -> openGameFolder());
+
+        fixOnlineButton = createStyledButton("Fix Online", new Color(200, 50, 50), btnSize, btnFont);
+        fixOnlineButton.addActionListener(e -> applyOnlineFix());
+
+        JButton bugReportButton = createStyledButton(
+                "Bug report",
+                new Color(220, 43, 0),
+                new Dimension(140, 36),
+                new Font("Segoe UI", Font.BOLD, 13)
+        );
+        bugReportButton.setToolTipText("Open GitHub Issues");
+        bugReportButton.addActionListener(e -> {
+            if (Desktop.isDesktopSupported()) {
+                try {
+                    Desktop.getDesktop().browse(
+                            new URI("https://github.com/0xcds4r/LingHy-Launcher/issues")
+                    );
+                } catch (Exception ignored) {}
+            }
+        });
+
+        JPanel buttonsPanel = new JPanel(new GridLayout(0, 2, 14, 14));
+        buttonsPanel.setOpaque(false);
+        buttonsPanel.setBorder(BorderFactory.createEmptyBorder(16, 0, 0, 0));
+
+        buttonsPanel.add(playButton);
+        buttonsPanel.add(modsButton);
+        buttonsPanel.add(versionButton);
+        buttonsPanel.add(folderButton);
+        buttonsPanel.add(fixOnlineButton);
+        buttonsPanel.add(bugReportButton);
+
+        footerPanel.add(infoPanel);
+        footerPanel.add(buttonsPanel);
+
+        panel.add(titleLabel);
+        panel.add(hintLabel);
         panel.add(usernameField);
-
-        panel.add(Box.createVerticalStrut(8));
-
-        JLabel infoLine1 = new JLabel("LingHy Launcher (v" + Environment.getVersion() +")");
-        infoLine1.setForeground(new Color(120, 120, 130));
-        infoLine1.setFont(new Font("Segoe UI", Font.PLAIN, 10));
-        infoLine1.setAlignmentX(Component.CENTER_ALIGNMENT);
-        panel.add(infoLine1);
-
-        JLabel infoLine2 = new JLabel("by 0xcds4r");
-        infoLine2.setForeground(new Color(120, 120, 130));
-        infoLine2.setFont(new Font("Segoe UI", Font.PLAIN, 10));
-        infoLine2.setAlignmentX(Component.CENTER_ALIGNMENT);
-        panel.add(infoLine2);
+        panel.add(footerPanel);
 
         return panel;
     }
+
 
     private void saveUsername()
     {
@@ -367,80 +491,97 @@ public class LauncherPanel extends JPanel
         }
     }
 
-    @Deprecated
-    private void startEditingUsername() {}
-
-    @Deprecated
-    private void finishEditingUsername() {}
-
     private List<NewsItem> fetchHytaleNews()
     {
         List<NewsItem> news = new ArrayList<>();
 
-        try {
+        try
+        {
             Document doc = Jsoup.connect("https://hytale.com/news")
-                    .userAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
-                    .timeout(8000)
+                    .userAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36")
+                    .timeout(15000)
                     .get();
 
-            Elements wrappers = doc.select(".postWrapper");
+            Elements wrappers = doc.select("div.postWrapper");
+            System.out.println("Found " + wrappers.size() + " news items on hytale.com");
 
             for (Element wrapper : wrappers)
             {
-                if (news.size() >= 6) break;
+                if (news.size() >= 16) break;
 
                 Element postLink = wrapper.selectFirst("a.post");
                 if (postLink == null) continue;
 
-                String title = getSafeText(wrapper, "h4.post__details__heading", "No Title");
+                Element titleEl = wrapper.selectFirst("h4.post__details__heading");
+                String title = titleEl != null ? titleEl.text().trim() : "No Title";
 
                 Element bodyEl = wrapper.selectFirst("span.post__details__body");
-                String rawDesc = "";
+                String desc = "";
+                if (bodyEl != null)
+                {
+                    String rawDesc = bodyEl.text().trim();
 
-                if (bodyEl != null) {
-                    rawDesc = bodyEl.html()
-                            .replaceAll("(?i)<br\\s*/?>", "\n")
-                            .replaceAll("<[^>]+>", "")
-                            .trim();
+                    if (rawDesc.startsWith(title)) {
+                        rawDesc = rawDesc.substring(title.length()).trim();
+                    }
+
+                    if (rawDesc.length() > 180)
+                    {
+                        desc = rawDesc.substring(0, 180) + "...";
+                    }
+                    else
+                    {
+                        desc = rawDesc;
+                    }
                 }
 
-                String desc = rawDesc.length() > 120 ? rawDesc.substring(0, 120) + "..." : rawDesc;
-
-                String meta = getSafeText(wrapper, "span.post__details__meta", "");
-
                 String date = "Unknown date";
+                Element metaEl = wrapper.selectFirst("span.post__details__meta");
 
-                Pattern p = Pattern.compile(
-                        "(January|February|March|April|May|June|July|August|September|October|November|December)\\s+" +
-                                "\\d{1,2}(st|nd|rd|th)\\s+\\d{4}"
-                );
+                if (metaEl != null)
+                {
+                    String metaText = metaEl.text();
 
-                Matcher m = p.matcher(meta);
-                if (m.find()) {
-                    date = m.group();
+                    Pattern p = Pattern.compile(
+                            "(January|February|March|April|May|June|July|August|September|October|November|December)\\s+" +
+                                    "\\d{1,2}(?:st|nd|rd|th)?\\s+\\d{4}"
+                    );
+
+                    Matcher m = p.matcher(metaText);
+                    if (m.find()) {
+                        date = m.group();
+                    }
                 }
 
                 String url = postLink.absUrl("href");
 
                 String imgUrl = "";
-                Element img = wrapper.selectFirst("span.post__image img");
-                if (img != null) {
+                Element img = wrapper.selectFirst("span.post__image__frame img");
+                if (img != null)
+                {
                     imgUrl = img.absUrl("src");
+
+                    if (imgUrl.startsWith("./")) {
+                        imgUrl = "https://hytale.com" + imgUrl.substring(1);
+                    } else if (!imgUrl.startsWith("http")) {
+                        imgUrl = "https://hytale.com" + imgUrl;
+                    }
                 }
 
                 news.add(new NewsItem(title, date, desc, url, imgUrl));
             }
-
-        } catch (Exception e) {
+        } catch (Exception e)
+        {
             System.err.println("Hytale News Loading Error: " + e.getMessage());
+            e.printStackTrace();
         }
 
         if (news.isEmpty())
         {
             news.add(new NewsItem(
                     "News unavailable",
-                    LocalDate.now().format(DateTimeFormatter.ofPattern("dd.MM.yyyy")),
-                    "Failed to load news. You may not have an internet connection.",
+                    LocalDate.now().format(DateTimeFormatter.ofPattern("MMMM dd yyyy")),
+                    "Failed to load news from hytale.com. Check your internet connection or try again later.",
                     "https://hytale.com/news",
                     ""
             ));
@@ -449,191 +590,214 @@ public class LauncherPanel extends JPanel
         return news;
     }
 
-    private String getSafeText(Element parent, String selector, String fallback)
+    private void loadNewsImageAsync(String urlStr, JLabel targetLabel, JPanel container)
     {
-        Element el = parent.selectFirst(selector);
-        return (el != null) ? el.text() : fallback;
+        new SwingWorker<ImageIcon, Void>() {
+            @Override
+            protected ImageIcon doInBackground() throws Exception {
+                SoftReference<ImageIcon> cached = imageCache.get(urlStr);
+                if (cached != null && cached.get() != null) {
+                    return cached.get();
+                }
+
+                URL url = new URL(urlStr);
+                BufferedImage img = ImageIO.read(url);
+                if (img == null) return null;
+
+                BufferedImage scaled = scaleAndCrop(img, 168, 94);
+                ImageIcon icon = new ImageIcon(scaled);
+                imageCache.put(urlStr, new SoftReference<>(icon));
+                return icon;
+            }
+
+            @Override
+            protected void done() {
+                try {
+                    ImageIcon icon = get();
+                    if (icon != null) {
+                        targetLabel.setIcon(icon);
+                        targetLabel.setText("");
+                    } else {
+                        targetLabel.setText("Failed");
+                    }
+                } catch (Exception e) {
+                    targetLabel.setText("Error");
+                }
+                container.revalidate();
+                container.repaint();
+            }
+        }.execute();
     }
 
-    private String escapeHtml(String input)
-    {
-        if (input == null) return "";
-        return input.replace("&amp;", "")
-                .replace("<", "&lt;")
-                .replace(">", "&gt;")
-                .replace("\"", "&quot;")
-                .replace("'", "&#39;")
-                .replace("-", "&nbsp;");
+    private BufferedImage scaleAndCrop(BufferedImage src, int tw, int th) {
+        double ratio = (double) src.getWidth() / src.getHeight();
+        double tRatio = (double) tw / th;
+
+        int nw, nh;
+        if (ratio > tRatio) {
+            nh = th;
+            nw = (int)(th * ratio);
+        } else {
+            nw = tw;
+            nh = (int)(tw / ratio);
+        }
+
+        Image scaled = src.getScaledInstance(nw, nh, Image.SCALE_SMOOTH);
+        BufferedImage result = new BufferedImage(tw, th, BufferedImage.TYPE_INT_ARGB);
+        Graphics2D g = result.createGraphics();
+        g.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BILINEAR);
+        g.drawImage(scaled, (tw - nw)/2, (th - nh)/2, null);
+        g.dispose();
+        return result;
     }
 
     private JPanel createNewsCard(NewsItem item)
     {
-        JPanel newsCard = new JPanel(new BorderLayout(16, 0));
-
-        newsCard.setBorder(BorderFactory.createCompoundBorder(
-                BorderFactory.createLineBorder(new Color(255, 168, 69, 100), 1, false),
-                BorderFactory.createEmptyBorder(18, 18, 18, 18)
-        ));
-
-        newsCard.setBackground(new Color(15, 15, 20, 200));
-        newsCard.setMaximumSize(new Dimension(Integer.MAX_VALUE, 160));
-
-        int textWidth = 440;
-
-        String htmlText =
-                "<html>" +
-                        "<div style='width:" + textWidth + "px;'>" +
-                        "<div style='color:#ffffff; font-size:17px; font-weight:bold; margin-bottom:8px;'>"
-                        + escapeHtml(item.title) + "</div>" +
-                        "<div style='color:#FFA845; font-size:12px; margin-bottom:12px;'>"
-                        + item.date + "</div>" +
-                        "<div style='color:#e0e0e0; font-size:9px; line-height:1.6;'>" +
-                        escapeHtml(item.description) +
-                        "</div>" +
-                        "</div>" +
-                        "</html>";
-
-        JLabel newsLabel = new JLabel(htmlText);
-        newsLabel.setVerticalAlignment(SwingConstants.TOP);
-
-        newsCard.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
-
-        newsCard.addMouseListener(new MouseAdapter()
+        var card = new JPanel(new GridBagLayout())
         {
-            @Override
-            public void mouseClicked(MouseEvent e)
+            private Color bgColor = new Color(22, 22, 28, 200);
+
             {
-                if (!item.url.isEmpty())
-                {
-                    try {
-                        Desktop.getDesktop().browse(new URI(item.url));
-                    } catch (Exception ex) {
-                        ex.printStackTrace();
-                    }
-                }
+                setOpaque(false);
+                setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+            }
+
+            public void setHoverBackground(boolean hover)
+            {
+                bgColor = hover
+                        ? new Color(32, 32, 42, 250)
+                        : new Color(22, 22, 28, 200);
+                repaint();
             }
 
             @Override
+            protected void paintComponent(Graphics g)
+            {
+                super.paintComponent(g);
+                Graphics2D g2 = (Graphics2D) g.create();
+                g2.setColor(bgColor);
+                g2.fillRect(0, 0, getWidth(), getHeight());
+                g2.dispose();
+            }
+        };
+
+        card.setBorder(BorderFactory.createCompoundBorder(
+                BorderFactory.createLineBorder(new Color(0, 0, 0, 0), 0),
+                BorderFactory.createEmptyBorder(16, 16, 16, 16)
+        ));
+
+        card.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+
+        MouseAdapter hover = new MouseAdapter()
+        {
+            @Override
             public void mouseEntered(MouseEvent e)
             {
-                newsCard.setBackground(new Color(20, 20, 28, 220));
-                newsCard.setBorder(BorderFactory.createCompoundBorder(
-                        BorderFactory.createLineBorder(new Color(255, 168, 69, 180), 2, false),
-                        BorderFactory.createEmptyBorder(18, 18, 18, 18)
-                ));
+                card.setHoverBackground(true);
             }
 
             @Override
             public void mouseExited(MouseEvent e)
             {
-                newsCard.setBackground(new Color(15, 15, 20, 200));
-                newsCard.setBorder(BorderFactory.createCompoundBorder(
-                        BorderFactory.createLineBorder(new Color(255, 168, 69, 100), 1, false),
-                        BorderFactory.createEmptyBorder(18, 18, 18, 18)
-                ));
+                card.setHoverBackground(false);
             }
-        });
 
-        JPanel imgPanel = new JPanel(new BorderLayout());
-        imgPanel.setBackground(new Color(9, 9, 9, 0));
-        imgPanel.setPreferredSize(new Dimension(180, 120));
-        imgPanel.setMinimumSize(new Dimension(180, 120));
-        imgPanel.setMaximumSize(new Dimension(180, 120));
+            @Override
+            public void mouseClicked(MouseEvent e)
+            {
+                if (Desktop.isDesktopSupported() && !item.url.isEmpty())
+                {
+                    try
+                    {
+                        Desktop.getDesktop().browse(new URI(item.url));
+                    }
+                    catch (Exception ex)
+                    {
+                        System.err.println("Failed to open news URL: " + ex.getMessage());
+                    }
+                }
+            }
+        };
+
+        card.addMouseListener(hover);
+
+        JPanel imgContainer = new JPanel(new BorderLayout());
+        imgContainer.setPreferredSize(new Dimension(168, 94));
+        imgContainer.setMinimumSize(new Dimension(168, 94));
+        imgContainer.setBackground(new Color(15, 15, 22));
+        imgContainer.setBorder(BorderFactory.createLineBorder(new Color(50, 50, 60), 1));
+
+        JLabel imgLabel = new JLabel("Loading...", SwingConstants.CENTER);
+        imgLabel.setForeground(new Color(100, 100, 110));
+        imgContainer.add(imgLabel, BorderLayout.CENTER);
 
         if (!item.imageUrl.isEmpty())
         {
-            SwingWorker<ImageIcon, Void> imgWorker = new SwingWorker<>()
-            {
-                @Override
-                protected ImageIcon doInBackground() throws Exception
-                {
-                    try {
-                        BufferedImage original = ImageIO.read(new URL(item.imageUrl));
-                        if (original == null) return null;
-
-                        int targetWidth = 180;
-                        int targetHeight = 120;
-
-                        double imgRatio = (double) original.getWidth() / original.getHeight();
-                        double panelRatio = (double) targetWidth / targetHeight;
-
-                        int newWidth, newHeight;
-                        int cropX = 0, cropY = 0;
-
-                        if (imgRatio > panelRatio)
-                        {
-                            newHeight = targetHeight;
-                            newWidth = (int) (targetHeight * imgRatio);
-                            cropX = (newWidth - targetWidth) / 2;
-                        }
-                        else
-                        {
-                            newWidth = targetWidth;
-                            newHeight = (int) (targetWidth / imgRatio);
-                            cropY = (newHeight - targetHeight) / 2;
-                        }
-
-                        Image scaled = original.getScaledInstance(newWidth, newHeight, Image.SCALE_SMOOTH);
-                        BufferedImage buffered = new BufferedImage(newWidth, newHeight, BufferedImage.TYPE_INT_ARGB);
-                        Graphics2D g2d = buffered.createGraphics();
-                        g2d.drawImage(scaled, 0, 0, null);
-                        g2d.dispose();
-
-                        BufferedImage cropped = buffered.getSubimage(cropX, cropY, targetWidth, targetHeight);
-
-                        return new ImageIcon(cropped);
-                    } catch (Exception e) {
-                        return null;
-                    }
-                }
-
-                @Override
-                protected void done()
-                {
-                    try {
-                        ImageIcon icon = get(3, TimeUnit.SECONDS);
-                        if (icon != null)
-                        {
-                            JLabel imgLabel = new JLabel(icon);
-                            imgLabel.setHorizontalAlignment(SwingConstants.CENTER);
-                            imgLabel.setVerticalAlignment(SwingConstants.CENTER);
-                            imgLabel.setPreferredSize(new Dimension(180, 120));
-                            imgLabel.setMinimumSize(new Dimension(180, 120));
-                            imgLabel.setMaximumSize(new Dimension(180, 120));
-
-                            imgLabel.setBorder(BorderFactory.createLineBorder(
-                                    new Color(255, 168, 69, 60), 1, true));
-
-                            imgPanel.removeAll();
-                            imgPanel.add(imgLabel, BorderLayout.CENTER);
-                            imgPanel.revalidate();
-                            imgPanel.repaint();
-                        }
-                        else
-                        {
-                            showPlaceholder(imgPanel);
-                        }
-                    } catch (Exception e) {
-                        showPlaceholder(imgPanel);
-                    }
-                }
-            };
-            imgWorker.execute();
-
-            JLabel loadingLabel = new JLabel("Loading...", SwingConstants.CENTER);
-            loadingLabel.setForeground(new Color(255, 168, 69, 100));
-            loadingLabel.setFont(new Font("Segoe UI", Font.ITALIC, 11));
-            imgPanel.add(loadingLabel, BorderLayout.CENTER);
+            loadNewsImageAsync(item.imageUrl, imgLabel, imgContainer);
         }
         else
         {
-            showPlaceholder(imgPanel);
+            imgLabel.setText("No image");
         }
 
-        newsCard.add(newsLabel, BorderLayout.CENTER);
-        newsCard.add(imgPanel, BorderLayout.EAST);
+        imgContainer.addMouseListener(hover);
 
-        return newsCard;
+        JPanel textPanel = new JPanel();
+        textPanel.setLayout(new BoxLayout(textPanel, BoxLayout.Y_AXIS));
+        textPanel.setOpaque(false);
+        textPanel.setBorder(BorderFactory.createEmptyBorder(4, 16, 4, 8));
+
+        JLabel title = new JLabel(item.title);
+        title.setFont(new Font("Segoe UI", Font.BOLD, 16));
+        title.setForeground(new Color(255, 178, 89));
+        title.setAlignmentX(Component.LEFT_ALIGNMENT);
+
+        JLabel meta = new JLabel(item.date + " • Hytale Team");
+        meta.setFont(new Font("Segoe UI", Font.PLAIN, 12));
+        meta.setForeground(new Color(140, 140, 155));
+        meta.setAlignmentX(Component.LEFT_ALIGNMENT);
+
+        JTextArea desc = new JTextArea(item.description);
+        desc.setFont(new Font("Segoe UI", Font.PLAIN, 13));
+        desc.setForeground(new Color(210, 210, 225));
+        desc.setLineWrap(true);
+        desc.setWrapStyleWord(true);
+        desc.setEditable(false);
+        desc.setFocusable(false);
+        desc.setOpaque(false);
+        desc.setAlignmentX(Component.LEFT_ALIGNMENT);
+
+        desc.setMaximumSize(new Dimension(480, Integer.MAX_VALUE));
+        desc.setPreferredSize(null);
+        desc.setBorder(BorderFactory.createEmptyBorder(0, 0, 8, 8));
+
+        textPanel.add(title);
+        textPanel.add(Box.createVerticalStrut(4));
+        textPanel.add(meta);
+        textPanel.add(Box.createVerticalStrut(10));
+        textPanel.add(desc);
+
+        textPanel.addMouseListener(hover);
+        title.addMouseListener(hover);
+        meta.addMouseListener(hover);
+        desc.addMouseListener(hover);
+
+        GridBagConstraints gbc = new GridBagConstraints();
+
+        gbc.gridx = 0;
+        gbc.gridy = 0;
+        gbc.gridheight = 2;
+        gbc.insets = new Insets(0, 0, 0, 16);
+        card.add(imgContainer, gbc);
+
+        gbc.gridx = 1;
+        gbc.gridheight = 1;
+        gbc.weightx = 1.0;
+        gbc.fill = GridBagConstraints.HORIZONTAL;
+        gbc.anchor = GridBagConstraints.NORTHWEST;
+        card.add(textPanel, gbc);
+
+        return card;
     }
 
     private void showPlaceholder(JPanel imgPanel)
@@ -652,52 +816,64 @@ public class LauncherPanel extends JPanel
         JPanel panel = new JPanel();
         panel.setLayout(new BoxLayout(panel, BoxLayout.Y_AXIS));
         panel.setOpaque(false);
-        panel.setBorder(BorderFactory.createEmptyBorder(0, 0, 0, 0));
 
-        JLabel loadingLabel = new JLabel("Loading news...", SwingConstants.CENTER);
-        loadingLabel.setForeground(new Color(255, 168, 69));
-        loadingLabel.setFont(new Font("Segoe UI", Font.PLAIN, 14));
-        panel.add(loadingLabel);
+        JLabel titleLabel = new JLabel("Hytale News");
+        titleLabel.setFont(new Font("Segoe UI", Font.BOLD, 18));
+        titleLabel.setForeground(new Color(235, 235, 245));
+        titleLabel.setAlignmentX(Component.LEFT_ALIGNMENT);
+        titleLabel.setBorder(BorderFactory.createEmptyBorder(0, 0, 16, 0));
+        panel.add(titleLabel);
 
-        SwingWorker<List<NewsItem>, Void> newsWorker = new SwingWorker<>()
+        JLabel loading = new JLabel("Loading news...", SwingConstants.CENTER);
+        loading.setFont(new Font("Segoe UI", Font.ITALIC, 14));
+        loading.setForeground(new Color(140, 140, 155));
+        panel.add(loading);
+
+        new SwingWorker<List<NewsItem>, Void>()
         {
-            @Override
-            protected List<NewsItem> doInBackground() {
+            @Override protected List<NewsItem> doInBackground() {
                 return fetchHytaleNews();
             }
 
-            @Override
-            protected void done()
+            @Override protected void done()
             {
                 try {
-                    List<NewsItem> newsItems = get();
+                    List<NewsItem> items = get(8, TimeUnit.SECONDS);
                     panel.removeAll();
+                    panel.add(titleLabel);
 
-                    for (NewsItem item : newsItems) {
-                        JPanel newsCard = createNewsCard(item);
-                        panel.add(newsCard);
-                        panel.add(Box.createVerticalStrut(14));
+                    if (items.isEmpty() || items.get(0).title.equals("News unavailable"))
+                    {
+                        JLabel err = new JLabel("Could not load news • " + LocalDate.now());
+                        err.setForeground(new Color(220, 80, 80));
+                        panel.add(err);
+                    }
+                    else
+                    {
+                        for (int i = 0; i < items.size(); i++)
+                        {
+                            panel.add(createNewsCard(items.get(i)));
+
+                            if (i < items.size() - 1) {
+                                panel.add(Box.createVerticalStrut(15));
+                            }
+                        }
                     }
 
                     panel.revalidate();
                     panel.repaint();
                 } catch (Exception e)
                 {
-                    System.err.println("Error loading news: " + e.getMessage());
                     panel.removeAll();
-
-                    JLabel errorLabel = new JLabel("Error loading news", SwingConstants.CENTER);
-                    errorLabel.setForeground(new Color(239, 68, 68));
-                    errorLabel.setFont(new Font("Segoe UI", Font.PLAIN, 13));
-                    panel.add(errorLabel);
-
+                    JLabel err = new JLabel("Failed to load news • Try again later");
+                    err.setForeground(new Color(220, 80, 80));
+                    panel.add(err);
                     panel.revalidate();
                     panel.repaint();
                 }
             }
-        };
+        }.execute();
 
-        newsWorker.execute();
         return panel;
     }
 
@@ -1019,138 +1195,78 @@ public class LauncherPanel extends JPanel
 
     private JPanel createBottomControls()
     {
-        JPanel bottom = new JPanel(new BorderLayout());
+        JPanel bottom = new JPanel(new BorderLayout(20, 0));
         bottom.setOpaque(false);
-        bottom.setBorder(BorderFactory.createEmptyBorder(20, 40, 20, 40));
-
-        JPanel leftPanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 10, 0));
-        leftPanel.setOpaque(false);
-
-        JButton versionButton = new JButton("Select version");
-        versionButton.setFont(new Font("Arial", Font.BOLD, 14));
-        versionButton.setForeground(Color.WHITE);
-        versionButton.setBackground(new Color(60, 60, 70));
-        versionButton.setPreferredSize(new Dimension(160, 90));
-        versionButton.setFocusPainted(false);
-        versionButton.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
-        versionButton.addActionListener(e -> openVersionSelector());
-
-        folderButton = new JButton("Folder");
-        folderButton.setFont(new Font("Segoe UI", Font.PLAIN, 13));
-        folderButton.setForeground(Color.WHITE);
-        folderButton.setBackground(new Color(60, 60, 70));
-        folderButton.setPreferredSize(new Dimension(140, 90));
-        folderButton.setFocusPainted(false);
-        folderButton.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
-        folderButton.setToolTipText("Open game folder");
-        folderButton.addActionListener(e -> openGameFolder());
-
-        folderButton.addMouseListener(new MouseAdapter()
-        {
-            @Override
-            public void mouseEntered(MouseEvent e) {
-                folderButton.setBackground(new Color(80, 80, 90));
-            }
-
-            @Override
-            public void mouseExited(MouseEvent e) {
-                folderButton.setBackground(new Color(60, 60, 70));
-            }
-        });
-
-        playButton = new JButton("PLAY");
-        playButton.setFont(new Font("Arial", Font.BOLD, 36));
-        playButton.setForeground(Color.WHITE);
-        playButton.setBackground(new Color(255, 168, 69, 180));
-        playButton.setPreferredSize(new Dimension(300, 90));
-        playButton.setFocusPainted(false);
-        playButton.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
-        playButton.addActionListener(e -> handlePlay());
-
-        JButton modsButton = new JButton("Mods");
-        modsButton.setFont(new Font("Segoe UI", Font.BOLD, 14));
-        modsButton.setForeground(Color.WHITE);
-        modsButton.setBackground(new Color(80, 60, 120));
-        modsButton.setPreferredSize(new Dimension(140, 90));
-        modsButton.setFocusPainted(false);
-        modsButton.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
-        modsButton.addActionListener(e -> openModManager());
-
-        leftPanel.add(modsButton);
-        leftPanel.add(versionButton);
-        leftPanel.add(folderButton);
-
-        fixOnlineButton = new JButton("<html><center>Fix<br>Online</center></html>");
-        fixOnlineButton.setFont(new Font("Segoe UI", Font.BOLD, 12));
-        fixOnlineButton.setForeground(Color.WHITE);
-        fixOnlineButton.setBackground(new Color(220, 38, 38));
-        fixOnlineButton.setPreferredSize(new Dimension(90, 90));
-        fixOnlineButton.setFocusPainted(false);
-        fixOnlineButton.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
-        fixOnlineButton.setToolTipText("Experimental function, works only on linux/windows");
-        fixOnlineButton.addActionListener(e -> applyOnlineFix());
-
-        fixOnlineButton.addMouseListener(new MouseAdapter()
-        {
-            @Override
-            public void mouseEntered(MouseEvent e) {
-                fixOnlineButton.setBackground(new Color(239, 68, 68));
-            }
-
-            @Override
-            public void mouseExited(MouseEvent e) {
-                fixOnlineButton.setBackground(new Color(220, 38, 38));
-            }
-        });
-
-        leftPanel.add(fixOnlineButton);
-
-        leftPanel.add(playButton);
-
-        bottom.add(leftPanel, BorderLayout.WEST);
+        bottom.setBorder(BorderFactory.createEmptyBorder(8, 32, 8, 32));
 
         JPanel progressPanel = createProgressSection();
-        bottom.add(progressPanel, BorderLayout.EAST);
+        bottom.add(progressPanel, BorderLayout.SOUTH);
 
         SwingWorker<GameVersion, Void> versionWorker = new SwingWorker<>()
         {
-            @Override
-            protected GameVersion doInBackground()
-            {
-                GameVersion savedVersion = versionManager.loadSelectedVersion();
-                if (savedVersion != null)
-                {
-                    if (versionManager.isVersionInstalled(savedVersion.getPatchNumber(), savedVersion.getBranch())) {
-                        return savedVersion;
-                    }
+            @Override protected GameVersion doInBackground() {
+                GameVersion saved = versionManager.loadSelectedVersion();
+                if (saved != null && versionManager.isVersionInstalled(saved.getPatchNumber(), saved.getBranch())) {
+                    return saved;
                 }
 
                 List<GameVersion> versions = versionManager.loadCachedVersions("release");
-                if (versions.isEmpty()) {
-                    versions = versionManager.loadCachedVersions("pre-release");
-                }
+                if (versions.isEmpty()) versions = versionManager.loadCachedVersions("pre-release");
 
                 return versions.isEmpty() ? null : versions.get(0);
             }
 
-            @Override
-            protected void done()
+            @Override protected void done()
             {
                 try {
-                    GameVersion version = get();
-                    if (version != null && selectedVersion == null)
-                    {
-                        selectedVersion = version;
+                    GameVersion v = get();
+                    if (v != null && selectedVersion == null) {
+                        selectedVersion = v;
                         updateFolderButtonText();
                     }
-                } catch (Exception e) {
-                    System.err.println("Error loading version: " + e.getMessage());
+                } catch (Exception ex) {
+                    System.err.println("Version load error: " + ex.getMessage());
                 }
             }
         };
         versionWorker.execute();
 
         return bottom;
+    }
+
+    private JButton createStyledButton(String text, Color bgColor, Dimension size, Font font)
+    {
+        JButton btn = new JButton(text);
+        btn.setFont(font);
+        btn.setForeground(Color.WHITE);
+        btn.setBackground(bgColor);
+        btn.setPreferredSize(size);
+        btn.setFocusPainted(false);
+        btn.setBorderPainted(false);
+        btn.setContentAreaFilled(true);
+        btn.setHorizontalAlignment(SwingConstants.CENTER);
+        btn.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+        btn.setOpaque(true);
+
+        btn.addMouseListener(new MouseAdapter() {
+            @Override public void mouseEntered(MouseEvent e) {
+                btn.setBackground(brighter(bgColor, 25));
+            }
+
+            @Override public void mouseExited(MouseEvent e) {
+                btn.setBackground(bgColor);
+            }
+        });
+
+        return btn;
+    }
+
+    private Color brighter(Color c, int factor)
+    {
+        int r = Math.min(255, c.getRed()   + factor);
+        int g = Math.min(255, c.getGreen() + factor);
+        int b = Math.min(255, c.getBlue()  + factor);
+        return new Color(r, g, b, c.getAlpha());
     }
 
     private void openModManager()

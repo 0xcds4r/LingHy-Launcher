@@ -179,6 +179,9 @@ public class Main
 
     public static void main(String[] args)
     {
+        java.security.Security.setProperty("networkaddress.cache.ttl", "60");
+        java.security.Security.setProperty("networkaddress.cache.negative.ttl", "10");
+
         if (args.length > 0)
         {
             String uri = args[0];

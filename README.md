@@ -64,6 +64,14 @@ v1.6.4:
 v1.6.5:
 - Added auto online-fix patcher for Windows (Experimental)
 
+v1.7:
+- UI reworked
+- News parser reworked
+- Added bug-report button
+- Download system reworked
+- Added mod import support (by button or drag & drop)
+- Code optimize & bug fix
+
 ### Screenshots:
 
 News & Control:
