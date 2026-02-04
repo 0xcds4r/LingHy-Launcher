@@ -1,0 +1,761 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<title>LingHy Launcher - Unofficial Hytale Launcher</title>
+	<style>
+		* {
+			margin: 0;
+			padding: 0;
+			box-sizing: border-box;
+		}
+
+		:root {
+			--bg-primary: #0a0a0a;
+			--bg-secondary: #1a1a1a;
+			--bg-tertiary: #2a2a2a;
+			--accent: #ffa845;
+			--accent-dark: #ff8c1a;
+			--text-primary: #f5f5f5;
+			--text-secondary: #a0a0a0;
+			--border: rgba(255, 168, 69, 0.2);
+		}
+
+		body {
+			font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+			background: var(--bg-primary);
+			color: var(--text-primary);
+			line-height: 1.6;
+			overflow-x: hidden;
+		}
+
+		.container {
+			max-width: 1200px;
+			margin: 0 auto;
+			padding: 0 20px;
+		}
+
+		header {
+			background: rgba(26, 26, 26, 0.95);
+			backdrop-filter: blur(10px);
+			position: fixed;
+			width: 100%;
+			top: 0;
+			z-index: 1000;
+			border-bottom: 1px solid var(--border);
+		}
+
+		nav {
+			display: flex;
+			justify-content: space-between;
+			align-items: center;
+			padding: 1.5rem 0;
+		}
+
+		.logo {
+			font-size: 1.8rem;
+			font-weight: bold;
+			color: var(--accent);
+			text-decoration: none;
+			display: flex;
+			align-items: center;
+			gap: 0.5rem;
+		}
+
+		.logo::before {
+			content: "";
+			font-size: 2rem;
+		}
+
+		.nav-links {
+			display: flex;
+			gap: 2rem;
+			list-style: none;
+		}
+
+		.nav-links a {
+			color: var(--text-secondary);
+			text-decoration: none;
+			transition: color 0.3s;
+			font-weight: 500;
+		}
+
+		.nav-links a:hover {
+			color: var(--accent);
+		}
+
+		.hero {
+			min-height: 100vh;
+			display: flex;
+			align-items: center;
+			justify-content: center;
+			text-align: center;
+			padding-top: 80px;
+			position: relative;
+			overflow: hidden;
+		}
+
+		.hero::before {
+			content: "";
+			position: absolute;
+			width: 500px;
+			height: 500px;
+			background: radial-gradient(circle, rgba(255, 168, 69, 0.15) 0%, transparent 70%);
+			border-radius: 50%;
+			top: 50%;
+			left: 50%;
+			transform: translate(-50%, -50%);
+			animation: pulse 4s ease-in-out infinite;
+		}
+
+		@keyframes pulse {
+			0%, 100% { transform: translate(-50%, -50%) scale(1); opacity: 0.5; }
+			50% { transform: translate(-50%, -50%) scale(1.1); opacity: 0.8; }
+		}
+
+		.hero-content {
+			position: relative;
+			z-index: 1;
+		}
+
+		.hero h1 {
+			font-size: 4rem;
+			margin-bottom: 1rem;
+			background: linear-gradient(135deg, var(--accent) 0%, var(--accent-dark) 100%);
+			-webkit-background-clip: text;
+			-webkit-text-fill-color: transparent;
+			background-clip: text;
+		}
+
+		.hero p {
+			font-size: 1.5rem;
+			color: var(--text-secondary);
+			margin-bottom: 2rem;
+		}
+
+		.version-tag {
+			display: inline-block;
+			background: var(--bg-tertiary);
+			padding: 0.5rem 1rem;
+			border-radius: 20px;
+			font-size: 0.9rem;
+			color: var(--accent);
+			margin-bottom: 2rem;
+			border: 1px solid var(--border);
+		}
+
+		.cta-buttons {
+			display: flex;
+			gap: 1rem;
+			justify-content: center;
+			flex-wrap: wrap;
+		}
+
+		.btn {
+			padding: 1rem 2.5rem;
+			font-size: 1.1rem;
+			border: none;
+			border-radius: 8px;
+			cursor: pointer;
+			text-decoration: none;
+			display: inline-flex;
+			align-items: center;
+			gap: 0.5rem;
+			transition: all 0.3s;
+			font-weight: 600;
+		}
+
+		.btn-primary {
+			background: var(--accent);
+			color: #000;
+		}
+
+		.btn-primary:hover {
+			background: var(--accent-dark);
+			transform: translateY(-2px);
+			box-shadow: 0 10px 30px rgba(255, 168, 69, 0.3);
+		}
+
+		.btn-secondary {
+			background: transparent;
+			color: var(--text-primary);
+			border: 2px solid var(--accent);
+		}
+
+		.btn-secondary:hover {
+			background: rgba(255, 168, 69, 0.1);
+			transform: translateY(-2px);
+		}
+
+		.features {
+			padding: 6rem 0;
+			background: var(--bg-secondary);
+		}
+
+		.section-title {
+			text-align: center;
+			font-size: 2.5rem;
+			margin-bottom: 3rem;
+			color: var(--accent);
+		}
+
+		.features-grid {
+			display: grid;
+			grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+			gap: 2rem;
+		}
+
+		.feature-card {
+			background: var(--bg-tertiary);
+			padding: 2rem;
+			border-radius: 12px;
+			border: 1px solid var(--border);
+			transition: all 0.3s;
+		}
+
+		.feature-card:hover {
+			transform: translateY(-5px);
+			border-color: var(--accent);
+			box-shadow: 0 10px 30px rgba(255, 168, 69, 0.2);
+		}
+
+		.feature-icon {
+			font-size: 3rem;
+			margin-bottom: 1rem;
+		}
+
+		.feature-card h3 {
+			font-size: 1.5rem;
+			margin-bottom: 1rem;
+			color: var(--accent);
+		}
+
+		.feature-card p {
+			color: var(--text-secondary);
+		}
+
+		.screenshots {
+			padding: 6rem 0;
+		}
+
+		.screenshot-grid {
+			display: grid;
+			grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+			gap: 2rem;
+			margin-top: 2rem;
+		}
+
+		@media (max-width: 480px) {
+			.screenshot-grid {
+				grid-template-columns: 1fr;
+			}
+		}
+
+		.screenshot-item {
+			background: var(--bg-secondary);
+			border-radius: 12px;
+			overflow: hidden;
+			border: 1px solid var(--border);
+			transition: all 0.3s ease;
+			cursor: pointer;
+		}
+
+		.screenshot-item:hover {
+			transform: translateY(-8px);
+			box-shadow: 0 15px 50px rgba(255, 168, 69, 0.4);
+			border-color: var(--accent);
+		}
+
+		.screenshot-item img {
+			width: 100%;
+			height: auto;
+			display: block;
+			object-fit: cover;
+			aspect-ratio: 16 / 9;
+			transition: transform 0.3s ease;
+		}
+
+		.screenshot-item:hover img {
+			transform: scale(1.02);
+		}
+
+		.screenshot-placeholder {
+			width: 100%;
+			height: 200px;
+			background: linear-gradient(135deg, var(--bg-tertiary) 0%, var(--bg-secondary) 100%);
+			display: flex;
+			align-items: center;
+			justify-content: center;
+			font-size: 3rem;
+			color: var(--accent);
+		}
+
+		.screenshot-caption {
+			padding: 1rem;
+			text-align: center;
+			color: var(--text-secondary);
+			font-weight: 500;
+		}
+
+		.lightbox {
+			display: none;
+			position: fixed;
+			z-index: 9999;
+			left: 0;
+			top: 0;
+			width: 100%;
+			height: 100%;
+			background-color: rgba(0, 0, 0, 0.95);
+			justify-content: center;
+			align-items: center;
+			animation: fadeIn 0.3s;
+		}
+
+		.lightbox.active {
+			display: flex;
+		}
+
+		.lightbox img {
+			max-width: 90%;
+			max-height: 90vh;
+			object-fit: contain;
+			border-radius: 8px;
+			box-shadow: 0 0 50px rgba(255, 168, 69, 0.3);
+		}
+
+		.lightbox-close {
+			position: absolute;
+			top: 2rem;
+			right: 2rem;
+			color: var(--text-primary);
+			font-size: 3rem;
+			cursor: pointer;
+			transition: color 0.3s;
+			line-height: 1;
+			z-index: 10000;
+		}
+
+		.lightbox-close:hover {
+			color: var(--accent);
+		}
+
+		.lightbox-caption {
+			position: absolute;
+			bottom: 2rem;
+			left: 50%;
+			transform: translateX(-50%);
+			color: var(--text-primary);
+			background: rgba(26, 26, 26, 0.8);
+			padding: 1rem 2rem;
+			border-radius: 8px;
+			font-size: 1.1rem;
+		}
+
+		.download {
+			padding: 6rem 0;
+			background: var(--bg-secondary);
+			text-align: center;
+		}
+
+		.download-options {
+			display: flex;
+			gap: 2rem;
+			justify-content: center;
+			margin-top: 2rem;
+			flex-wrap: wrap;
+		}
+
+		.download-card {
+			background: var(--bg-tertiary);
+			padding: 2rem;
+			border-radius: 12px;
+			border: 1px solid var(--border);
+			min-width: 250px;
+		}
+
+		.download-card h3 {
+			color: var(--accent);
+			margin-bottom: 1rem;
+		}
+
+		.download-card .os-icon {
+			font-size: 3rem;
+			margin-bottom: 1rem;
+		}
+
+		footer {
+			background: var(--bg-primary);
+			padding: 3rem 0;
+			text-align: center;
+			border-top: 1px solid var(--border);
+		}
+
+		.footer-links {
+			display: flex;
+			gap: 2rem;
+			justify-content: center;
+			margin-bottom: 1rem;
+			flex-wrap: wrap;
+		}
+
+		.footer-links a {
+			color: var(--text-secondary);
+			text-decoration: none;
+			transition: color 0.3s;
+		}
+
+		.footer-links a:hover {
+			color: var(--accent);
+		}
+
+		.footer-text {
+			color: var(--text-secondary);
+			font-size: 0.9rem;
+		}
+
+		.footer-text a {
+			color: var(--accent);
+			text-decoration: none;
+		}
+
+		.footer-text a:hover {
+			text-decoration: underline;
+		}
+
+		.scroll-indicator {
+			position: absolute;
+			bottom: 2rem;
+			left: 50%;
+			transform: translateX(-50%);
+			animation: bounce 2s infinite;
+		}
+
+		@keyframes bounce {
+			0%, 20%, 50%, 80%, 100% { transform: translateX(-50%) translateY(0); }
+			40% { transform: translateX(-50%) translateY(-10px); }
+			60% { transform: translateX(-50%) translateY(-5px); }
+		}
+
+		.scroll-indicator::after {
+			content: "↓";
+			font-size: 2rem;
+			color: var(--accent);
+		}
+
+		.mobile-menu-btn {
+			display: none;
+			background: none;
+			border: none;
+			color: var(--text-primary);
+			font-size: 1.5rem;
+			cursor: pointer;
+		}
+
+		@media (max-width: 768px) {
+			.hero h1 {
+				font-size: 2.5rem;
+			}
+
+			.hero p {
+				font-size: 1.2rem;
+			}
+
+			.nav-links {
+				display: none;
+			}
+
+			.mobile-menu-btn {
+				display: block;
+			}
+
+			.cta-buttons {
+				flex-direction: column;
+			}
+
+			.btn {
+				width: 100%;
+				justify-content: center;
+			}
+		}
+
+		.fade-in {
+			opacity: 0;
+			transform: translateY(20px);
+			animation: fadeIn 0.6s forwards;
+		}
+
+		@keyframes fadeIn {
+			to {
+				opacity: 1;
+				transform: translateY(0);
+			}
+		}
+
+		.feature-card:nth-child(1) { animation-delay: 0.1s; }
+		.feature-card:nth-child(2) { animation-delay: 0.2s; }
+		.feature-card:nth-child(3) { animation-delay: 0.3s; }
+		.feature-card:nth-child(4) { animation-delay: 0.4s; }
+		.feature-card:nth-child(5) { animation-delay: 0.5s; }
+		.feature-card:nth-child(6) { animation-delay: 0.6s; }
+	</style>
+</head>
+<body>
+	<header>
+		<nav class="container">
+			<a href="#" class="logo">LingHy Launcher</a>
+			<ul class="nav-links">
+				<li><a href="#features">Features</a></li>
+				<li><a href="#screenshots">Screenshots</a></li>
+				<li><a href="#download">Download</a></li>
+				<li><a href="https://github.com/0xcds4r/LingHy-Launcher" target="_blank">GitHub</a></li>
+			</ul>
+			<button class="mobile-menu-btn">☰</button>
+		</nav>
+	</header>
+
+	<main>
+		<section class="hero">
+			<div class="hero-content">
+				<div class="version-tag">Open Source • Community Driven</div>
+				<h1>LingHy Launcher</h1>
+				<p>The Ultimate Unofficial Hytale Launcher</p>
+				<div class="cta-buttons">
+					<a href="#download" class="btn btn-primary">
+						<span>⬇</span>
+						Download Now
+					</a>
+					<a href="https://github.com/0xcds4r/LingHy-Launcher" class="btn btn-secondary" target="_blank">
+						<span>⭐</span>
+						View on GitHub
+					</a>
+				</div>
+			</div>
+			<div class="scroll-indicator"></div>
+		</section>
+
+		<section id="features" class="features">
+			<div class="container">
+				<h2 class="section-title">Features</h2>
+				<div class="features-grid">
+					<div class="feature-card fade-in">
+						<div class="feature-icon">🚀</div>
+						<h3>Fast & Lightweight</h3>
+						<p>Optimized performance with minimal resource usage. Built with Java for maximum compatibility.</p>
+					</div>
+					<div class="feature-card fade-in">
+						<div class="feature-icon">🎮</div>
+						<h3>Version Management</h3>
+						<p>Easily switch between different game versions. Support for both Release and Pre-Release branches.</p>
+					</div>
+					<div class="feature-card fade-in">
+						<div class="feature-icon">🔧</div>
+						<h3>Mod Support</h3>
+						<p>Integrated CurseForge mod browser. Install, update, and manage mods with ease.</p>
+					</div>
+					<div class="feature-card fade-in">
+						<div class="feature-icon">🌐</div>
+						<h3>Online Fix</h3>
+						<p>Built-in patch to enable online mode. Play with friends without hassle.</p>
+					</div>
+					<div class="feature-card fade-in">
+						<div class="feature-icon">📰</div>
+						<h3>News feed</h3>
+						<p>Stay updated with the latest Hytale news directly in the launcher.</p>
+					</div>
+					<div class="feature-card fade-in">
+						<div class="feature-icon">💻</div>
+						<h3>Cross-Platform</h3>
+						<p>Works on Windows, Linux, and macOS. Same great experience everywhere.</p>
+					</div>
+				</div>
+			</div>
+		</section>
+
+		<section id="screenshots" class="screenshots">
+			<div class="container">
+				<h2 class="section-title">Screenshots</h2>
+				<div class="screenshot-grid">
+					<div class="screenshot-item">
+						<img src="https://raw.githubusercontent.com/0xcds4r/LingHy-Launcher/refs/heads/main/preview/01.png" alt="With news feed & controls" loading="lazy">
+						<div class="screenshot-caption">Main Interface</div>
+					</div>
+					<div class="screenshot-item">
+						<img src="https://raw.githubusercontent.com/0xcds4r/LingHy-Launcher/refs/heads/main/preview/02.png" alt="Latest hytale releases" loading="lazy">
+						<div class="screenshot-caption">Version Management</div>
+					</div>
+					<div class="screenshot-item">
+						<img src="https://raw.githubusercontent.com/0xcds4r/LingHy-Launcher/refs/heads/main/preview/03.png" alt="Latest hytale pre-releases" loading="lazy">
+						<div class="screenshot-caption">Version Management</div>
+					</div>
+					<div class="screenshot-item">
+						<img src="https://raw.githubusercontent.com/0xcds4r/LingHy-Launcher/refs/heads/main/preview/04.png" alt="Easy to import .jar mods" loading="lazy">
+						<div class="screenshot-caption">Mod manager</div>
+					</div>
+					<div class="screenshot-item">
+						<img src="https://raw.githubusercontent.com/0xcds4r/LingHy-Launcher/refs/heads/main/preview/05.png" alt="CurseForge Browser" loading="lazy">
+						<div class="screenshot-caption">CurseForge Integration</div>
+					</div>
+					<div class="screenshot-item">
+						<img src="https://raw.githubusercontent.com/0xcds4r/LingHy-Launcher/refs/heads/main/preview/07.png" alt="Just click 'Fix online' button in launcher for open multiplayer" loading="lazy">
+						<div class="screenshot-caption">Online Fix In One Click</div>
+					</div>
+				</div>
+			</div>
+		</section>
+
+		<section id="download" class="download">
+			<div class="container">
+				<h2 class="section-title">Download LingHy</h2>
+				<p style="color: var(--text-secondary); margin-bottom: 2rem;">
+					Choose your platform and start playing
+				</p>
+				<div class="download-options">
+					<div class="download-card">
+						<div class="os-icon">🪟</div>
+						<h3>Windows</h3>
+						<p style="color: var(--text-secondary); margin-bottom: 1rem;">Windows 10/11</p>
+						<a href="https://github.com/0xcds4r/LingHy-Launcher/releases/download/release/linghy-launcher.exe" class="btn btn-primary" target="_blank">Download</a>
+					</div>
+					<div class="download-card">
+						<div class="os-icon">🐧</div>
+						<h3>Linux</h3>
+						<p style="color: var(--text-secondary); margin-bottom: 1rem;">Ubuntu, Debian, Arch</p>
+						<a href="https://github.com/0xcds4r/LingHy-Launcher/releases" class="btn btn-primary" target="_blank">Download</a>
+					</div>
+					<div class="download-card">
+						<div class="os-icon">🍎</div>
+						<h3>macOS</h3>
+						<p style="color: var(--text-secondary); margin-bottom: 1rem;">macOS 10.15+</p>
+						<a href="https://github.com/0xcds4r/LingHy-Launcher/releases" class="btn btn-primary" target="_blank">Download</a>
+					</div>
+				</div>
+				<div style="margin-top: 3rem;">
+					<a href="https://github.com/0xcds4r/LingHy-Launcher/issues" class="btn btn-secondary" target="_blank">
+						Report Bug
+					</a>
+				</div>
+			</div>
+		</section>
+	</main>
+
+	<!-- Lightbox Modal -->
+	<div id="lightbox" class="lightbox">
+		<span class="lightbox-close">&times;</span>
+		<img id="lightbox-img" src="" alt="">
+		<div id="lightbox-caption" class="lightbox-caption"></div>
+	</div>
+
+	<footer>
+		<div class="container">
+			<div class="footer-links">
+				<a href="https://github.com/0xcds4r/LingHy-Launcher" target="_blank">GitHub</a>
+				<a href="https://github.com/0xcds4r/LingHy-Launcher/issues" target="_blank">Issues</a>
+				<a href="https://github.com/0xcds4r/LingHy-Launcher/wiki" target="_blank">Wiki</a>
+				<a href="https://github.com/0xcds4r" target="_blank">Developer</a>
+			</div>
+			<p class="footer-text">
+				Made with ❤️ by <a href="https://github.com/0xcds4r" target="_blank">0xcds4r</a><br>
+				Not affiliated with Hypixel Studios. Hytale is a trademark of Hypixel Studios.
+			</p>
+		</div>
+	</footer>
+
+	<script>
+		// Smooth scrolling
+		document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+			anchor.addEventListener('click', function (e) {
+				e.preventDefault();
+				const target = document.querySelector(this.getAttribute('href'));
+				if (target) {
+					target.scrollIntoView({
+						behavior: 'smooth',
+						block: 'start'
+					});
+				}
+			});
+		});
+
+		// Fade in animation on scroll
+		const observerOptions = {
+			threshold: 0.1,
+			rootMargin: '0px 0px -100px 0px'
+		};
+
+		const observer = new IntersectionObserver((entries) => {
+			entries.forEach(entry => {
+				if (entry.isIntersecting) {
+					entry.target.classList.add('fade-in');
+				}
+			});
+		}, observerOptions);
+
+		document.querySelectorAll('.feature-card, .screenshot-item').forEach(el => {
+			observer.observe(el);
+		});
+
+		// Mobile menu toggle (simple implementation)
+		const mobileMenuBtn = document.querySelector('.mobile-menu-btn');
+		const navLinks = document.querySelector('.nav-links');
+
+		mobileMenuBtn.addEventListener('click', () => {
+			navLinks.style.display = navLinks.style.display === 'flex' ? 'none' : 'flex';
+			if (navLinks.style.display === 'flex') {
+				navLinks.style.position = 'absolute';
+				navLinks.style.top = '100%';
+				navLinks.style.left = '0';
+				navLinks.style.right = '0';
+				navLinks.style.background = 'var(--bg-secondary)';
+				navLinks.style.flexDirection = 'column';
+				navLinks.style.padding = '1rem';
+				navLinks.style.borderTop = '1px solid var(--border)';
+			}
+		});
+
+		// Hide scroll indicator after scrolling
+		let scrolled = false;
+		window.addEventListener('scroll', () => {
+			if (!scrolled && window.scrollY > 100) {
+				document.querySelector('.scroll-indicator').style.opacity = '0';
+				scrolled = true;
+			}
+		});
+
+		// Lightbox functionality
+		const lightbox = document.getElementById('lightbox');
+		const lightboxImg = document.getElementById('lightbox-img');
+		const lightboxCaption = document.getElementById('lightbox-caption');
+		const lightboxClose = document.querySelector('.lightbox-close');
+
+		// Add click handlers to all screenshot images
+		document.querySelectorAll('.screenshot-item img').forEach(img => {
+			img.addEventListener('click', () => {
+				lightbox.classList.add('active');
+				lightboxImg.src = img.src;
+				lightboxCaption.textContent = img.alt;
+				document.body.style.overflow = 'hidden';
+			});
+		});
+
+		// Close lightbox
+		const closeLightbox = () => {
+			lightbox.classList.remove('active');
+			document.body.style.overflow = '';
+		};
+
+		lightboxClose.addEventListener('click', closeLightbox);
+		lightbox.addEventListener('click', (e) => {
+			if (e.target === lightbox) {
+				closeLightbox();
+			}
+		});
+
+		// Close on Escape key
+		document.addEventListener('keydown', (e) => {
+			if (e.key === 'Escape' && lightbox.classList.contains('active')) {
+				closeLightbox();
+			}
+		});
+	</script>
+</body>
+</html>
