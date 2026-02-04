@@ -2,8 +2,15 @@ package com.linghy.launcher;
 
 import com.linghy.env.Environment;
 
+import javax.imageio.ImageIO;
 import javax.swing.*;
 import java.awt.*;
+import javax.imageio.ImageIO;
+import java.awt.Image;
+import java.awt.image.BufferedImage;
+import java.io.InputStream;
+import java.util.ArrayList;
+import java.util.List;
 
 public class LauncherFrame extends JFrame
 {
@@ -11,6 +18,7 @@ public class LauncherFrame extends JFrame
     {
         setTitle("LingHy v" + Environment.getVersion());
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+        setIconImages(loadAppIcons());
 
         Dimension screen = Toolkit.getDefaultToolkit().getScreenSize();
 
@@ -38,6 +46,32 @@ public class LauncherFrame extends JFrame
         setContentPane(panel);
 
         addWindowDragListener();
+    }
+
+    private List<Image> loadAppIcons()
+    {
+        List<Image> icons = new ArrayList<>();
+        String[] sizes = {"16", "32", "64", "128", "256", "512"};
+
+        for (String size : sizes)
+        {
+            try
+            {
+                InputStream is = getClass().getResourceAsStream("/icons/logo_" + size + ".png");
+                if (is != null)
+                {
+                    BufferedImage img = ImageIO.read(is);
+                    icons.add(img);
+                    System.out.println("loading logo: " + "/icons/logo_" + size + ".png");
+                }
+            }
+            catch (Exception e)
+            {
+                System.err.println("Failed to load icon " + size + "x" + size);
+            }
+        }
+
+        return icons;
     }
 
     private void addWindowDragListener()
