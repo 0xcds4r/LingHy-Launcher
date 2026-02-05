@@ -1,10 +1,14 @@
 package com.linghy.launcher;
 
+import com.linghy.config.AuthConfig;
 import com.linghy.env.Environment;
 import com.linghy.java.JREDownloader;
+import com.linghy.model.GameSession;
+import com.linghy.model.ProgressCallback;
 import com.linghy.model.ProgressUpdate;
 import com.linghy.mods.ModManagerDialog;
 import com.linghy.patches.OnlineFix;
+import com.linghy.patches.PatchManager;
 import com.linghy.pwr.GameInstaller;
 
 import javax.imageio.ImageIO;
@@ -32,6 +36,8 @@ import java.util.concurrent.TimeUnit;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import com.linghy.service.AuthService;
+import com.linghy.service.TokenManager;
 import com.linghy.version.GameVersion;
 import com.linghy.version.VersionManager;
 import org.jsoup.Jsoup;
@@ -66,6 +72,9 @@ public class LauncherPanel extends JPanel
 
     private VersionManager versionManager;
     private GameVersion selectedVersion;
+    private AuthService authService;
+    private PatchManager patchManager;
+    private AuthConfig authConfig;
 
     private static final Map<String, SoftReference<ImageIcon>> imageCache = new ConcurrentHashMap<>();
 
@@ -73,6 +82,11 @@ public class LauncherPanel extends JPanel
     {
         this.parent = parent;
         this.versionManager = new VersionManager();
+
+        this.authConfig = AuthConfig.load();
+        this.authService = new AuthService();
+        this.patchManager = new PatchManager();
+
         setLayout(new BorderLayout());
         setOpaque(false);
 
@@ -424,8 +438,8 @@ public class LauncherPanel extends JPanel
         folderButton = createStyledButton("Folder", new Color(70, 70, 85), btnSize, btnFont);
         folderButton.addActionListener(e -> openGameFolder());
 
-        fixOnlineButton = createStyledButton("Fix Online", new Color(200, 50, 50), btnSize, btnFont);
-        fixOnlineButton.addActionListener(e -> applyOnlineFix());
+//        fixOnlineButton = createStyledButton("Fix Online", new Color(200, 50, 50), btnSize, btnFont);
+//        fixOnlineButton.addActionListener(e -> applyOnlineFix());
 
         JButton bugReportButton = createStyledButton(
                 "Bug report",
@@ -444,6 +458,18 @@ public class LauncherPanel extends JPanel
             }
         });
 
+        JButton settingsButton = createStyledButton(
+                "Settings",
+                new Color(90, 90, 90),
+                new Dimension(140, 36),
+                new Font("Segoe UI", Font.BOLD, 13)
+        );
+        settingsButton.setToolTipText("Launcher settings");
+        settingsButton.addActionListener(e -> {
+            SettingsDialog dialog = new SettingsDialog((Frame) SwingUtilities.getWindowAncestor(this));
+            dialog.setVisible(true);
+        });
+
         JPanel buttonsPanel = new JPanel(new GridLayout(0, 2, 14, 14));
         buttonsPanel.setOpaque(false);
         buttonsPanel.setBorder(BorderFactory.createEmptyBorder(16, 0, 0, 0));
@@ -452,8 +478,9 @@ public class LauncherPanel extends JPanel
         buttonsPanel.add(modsButton);
         buttonsPanel.add(versionButton);
         buttonsPanel.add(folderButton);
-        buttonsPanel.add(fixOnlineButton);
+//        buttonsPanel.add(fixOnlineButton);
         buttonsPanel.add(bugReportButton);
+        buttonsPanel.add(settingsButton);
 
         footerPanel.add(infoPanel);
         footerPanel.add(buttonsPanel);
@@ -1039,6 +1066,7 @@ public class LauncherPanel extends JPanel
         return button;
     }
 
+    @Deprecated
     private void applyOnlineFix()
     {
         if (selectedVersion == null)
@@ -1050,65 +1078,42 @@ public class LauncherPanel extends JPanel
             return;
         }
 
-        int result = JOptionPane.showConfirmDialog(this,
-                "This will patch the HytaleClient binary to fix online mode.\n" +
+        int choice = JOptionPane.showConfirmDialog(this,
+                "This will apply ALL patches:\n" +
+                        "• Replace hytale.com domain\n" +
+                        "• Bypass online checks\n" +
                         "A backup will be created automatically.\n\n" +
                         "Continue?",
-                "Apply Online Fix",
+                "Apply All Patches",
                 JOptionPane.YES_NO_OPTION,
                 JOptionPane.WARNING_MESSAGE);
 
-        if (result != JOptionPane.YES_OPTION) {
+        if (choice != JOptionPane.YES_OPTION) {
             return;
         }
 
-        Path gameDir = versionManager.getVersionDirectory(
-                selectedVersion.getPatchNumber(),
-                selectedVersion.getBranch()
-        );
+        fixOnlineButton.setEnabled(false);
+        fixOnlineButton.setText("<html><center>Patching...</center></html>");
 
-        Path clientDir = gameDir.resolve("Client");
-        String clientName = Environment.getOS().equals("windows")
-                ? "HytaleClient.exe" : "HytaleClient";
-        Path clientPath = clientDir.resolve(clientName);
-
-        if (!Files.exists(clientPath))
-        {
-            JOptionPane.showMessageDialog(this,
-                    "HytaleClient not found in:\n" + clientPath,
-                    "Client Not Found",
-                    JOptionPane.ERROR_MESSAGE);
-            return;
-        }
-
-        if (fixOnlineButton != null) {
-            fixOnlineButton.setEnabled(false);
-            fixOnlineButton.setText("<html><center>Patching...</center></html>");
-        }
-
-        String os = Environment.getOS();
-
-        SwingWorker<Object, String> worker = new SwingWorker<>()
+        SwingWorker<Void, ProgressUpdate> worker = new SwingWorker<>()
         {
             @Override
-            protected Object doInBackground() throws Exception
+            protected Void doInBackground() throws Exception
             {
-                if (os.equals("windows"))
-                {
-                    return com.linghy.patches.OnlineFixWin.applyPatch(clientPath, this::publish);
-                }
-                else
-                {
-                    return OnlineFix.applyPatch(clientPath, this::publish);
-                }
+                patchManager.ensureGamePatched(selectedVersion, update -> {
+                    publish(update);
+                });
+
+                return null;
             }
 
             @Override
-            protected void process(java.util.List<String> chunks)
+            protected void process(java.util.List<ProgressUpdate> chunks)
             {
-                if (!chunks.isEmpty()) {
-                    String message = chunks.get(chunks.size() - 1);
-                    statusLabel.setText(message);
+                if (!chunks.isEmpty())
+                {
+                    ProgressUpdate update = chunks.get(chunks.size() - 1);
+                    updateProgress(update);
                 }
             }
 
@@ -1117,75 +1122,34 @@ public class LauncherPanel extends JPanel
             {
                 try
                 {
-                    Object result = get();
-                    boolean success;
-                    String message;
-                    Path backupFile;
+                    get();
 
-                    if (result instanceof OnlineFix.PatchResult)
-                    {
-                        OnlineFix.PatchResult patchResult = (OnlineFix.PatchResult) result;
-                        success = patchResult.success;
-                        message = patchResult.message;
-                        backupFile = patchResult.backupFile;
-                    }
-                    else if (result instanceof com.linghy.patches.OnlineFixWin.PatchResult)
-                    {
-                        com.linghy.patches.OnlineFixWin.PatchResult patchResult =
-                                (com.linghy.patches.OnlineFixWin.PatchResult) result;
-                        success = patchResult.success;
-                        message = patchResult.message;
-                        backupFile = patchResult.backupFile;
-                    }
-                    else
-                    {
-                        throw new Exception("Unknown patch result type");
-                    }
+                    statusLabel.setText("All patches applied successfully");
 
-                    if (success)
-                    {
-                        statusLabel.setText("Online fix applied successfully");
-
-                        JOptionPane.showMessageDialog(
-                                LauncherPanel.this,
-                                "Online fix applied successfully!\n\n" +
-                                        "Backup saved to:\n" +
-                                        (backupFile != null ? backupFile.toString() : "N/A"),
-                                "Success",
-                                JOptionPane.INFORMATION_MESSAGE
-                        );
-                    }
-                    else
-                    {
-                        statusLabel.setText("Patch failed: " + message);
-
-                        JOptionPane.showMessageDialog(
-                                LauncherPanel.this,
-                                "Failed to apply patch:\n" + message,
-                                "Patch Failed",
-                                JOptionPane.ERROR_MESSAGE
-                        );
-                    }
+                    JOptionPane.showMessageDialog(
+                            LauncherPanel.this,
+                            "All patches (domain + online fix) applied successfully!\n" +
+                                    "Backups created where needed.",
+                            "Success",
+                            JOptionPane.INFORMATION_MESSAGE
+                    );
                 }
                 catch (Exception e)
                 {
                     e.printStackTrace();
-                    statusLabel.setText("Error: " + e.getMessage());
+                    statusLabel.setText("Patching error");
 
                     JOptionPane.showMessageDialog(
                             LauncherPanel.this,
-                            "Error applying patch:\n" + e.getMessage(),
+                            "Error during patching:\n" + e.getMessage(),
                             "Error",
                             JOptionPane.ERROR_MESSAGE
                     );
                 }
                 finally
                 {
-                    if (fixOnlineButton != null)
-                    {
-                        fixOnlineButton.setEnabled(true);
-                        fixOnlineButton.setText("<html><center>Fix<br>Online</center></html>");
-                    }
+                    fixOnlineButton.setEnabled(true);
+                    fixOnlineButton.setText("<html><center>Fix<br>Online</center></html>");
                 }
             }
         };
@@ -1402,7 +1366,7 @@ public class LauncherPanel extends JPanel
             if (versions.isEmpty())
             {
                 JOptionPane.showMessageDialog(this,
-                        "Press 'Select version' for select game version",
+                        "Press 'Versions' for select game version",
                         "Version not selected",
                         JOptionPane.INFORMATION_MESSAGE);
                 return;
@@ -1418,10 +1382,10 @@ public class LauncherPanel extends JPanel
         String finalPlayerName = playerName;
         GameVersion versionToInstall = selectedVersion;
 
-        SwingWorker<Path, ProgressUpdate> worker = new SwingWorker<>()
+        SwingWorker<GameSession, ProgressUpdate> worker = new SwingWorker<>()
         {
             @Override
-            protected Path doInBackground() throws Exception
+            protected GameSession doInBackground() throws Exception
             {
                 try {
                     publish(new ProgressUpdate("jre", 0, "Checking JRE...", "", "", 0, 0));
@@ -1431,11 +1395,17 @@ public class LauncherPanel extends JPanel
                             versionToInstall.getName() + "...", "", "", 0, 0));
 
                     Path gameDir = GameInstaller.installGameVersion(versionToInstall, this::publish);
-
                     versionManager.markVersionInstalled(versionToInstall);
 
+                    publish(new ProgressUpdate("patch", 0, "Applying patches...", "", "", 0, 0));
+                    patchManager.ensureGamePatched(versionToInstall, this::publish);
+
+                    publish(new ProgressUpdate("auth", 0, "Authenticating...", "", "", 0, 0));
+                    GameSession session = TokenManager.getOrFetchSession(
+                            finalPlayerName, authService);
+
                     publish(new ProgressUpdate("launch", 100, "Launching game...", "", "", 0, 0));
-                    return gameDir;
+                    return session;
 
                 } catch (Exception e)
                 {
@@ -1456,9 +1426,13 @@ public class LauncherPanel extends JPanel
             protected void done()
             {
                 try {
-                    Path gameDir = get();
+                    GameSession session = get();
+                    Path gameDir = versionManager.getVersionDirectory(
+                            versionToInstall.getPatchNumber(),
+                            versionToInstall.getBranch()
+                    );
 
-                    launchGameFromDirectory(gameDir, finalPlayerName);
+                    launchGameWithSession(gameDir, session, true);
 
                     playButton.setText("PLAY");
                     playButton.setEnabled(true);
@@ -1570,6 +1544,50 @@ public class LauncherPanel extends JPanel
         throw new IOException("No executable found in Client directory: " + clientDir);
     }
 
+    private void launchGameWithSession(Path gameDir, GameSession session, boolean useAuth) throws Exception
+    {
+        Path clientDir = gameDir.resolve("Client");
+        String clientName = findClientExecutable(clientDir);
+        Path clientPath = clientDir.resolve(clientName);
+
+        if (!Files.exists(clientPath) || !Files.isExecutable(clientPath)) {
+            throw new Exception("Game client executable not found or not executable: " + clientPath);
+        }
+
+        Path userDataDir = Environment.getDefaultAppDir().resolve("UserData");
+        Files.createDirectories(userDataDir);
+
+        if (!Environment.getOS().equals("windows")) {
+            clientPath.toFile().setExecutable(true, false);
+        }
+
+        ProcessBuilder pb = new ProcessBuilder(
+                clientPath.toAbsolutePath().toString(),
+                "--app-dir", gameDir.toAbsolutePath().toString(),
+                "--user-dir", userDataDir.toAbsolutePath().toString(),
+                "--java-exec", JREDownloader.getJavaExec(),
+                "--auth-mode", (useAuth ? "authenticated" : "offline"),
+                "--uuid", session.getUuid(),
+                "--name", session.getUsername(),
+                "--identity-token", (useAuth ? session.getIdentityToken() : ""),
+                "--session-token", (useAuth ? session.getSessionToken() : "")
+        );
+
+        pb.directory(gameDir.toFile());
+        pb.redirectOutput(ProcessBuilder.Redirect.INHERIT);
+        pb.redirectError(ProcessBuilder.Redirect.INHERIT);
+
+        System.out.println("Launching from: " + gameDir);
+        System.out.println("Command: " + pb.command());
+
+        Process process = pb.start();
+
+        SwingUtilities.invokeLater(() -> {
+            parent.setExtendedState(ICONIFIED);
+        });
+    }
+
+    @Deprecated
     private void launchGameFromDirectory(Path gameDir, String playerName) throws Exception
     {
         if (playerName == null || playerName.trim().isEmpty())
@@ -1608,9 +1626,6 @@ public class LauncherPanel extends JPanel
                 "--auth-mode", "offline",
                 "--uuid", UUIDGen.generateUUID(playerName),
                 "--name", playerName
-                //,
-//                "--identity-token", UUIDGen.generateIdentityToken(playerName),
-//                "--session-token", UUIDGen.generateSessionToken()
         );
 
         pb.directory(gameDir.toFile());

@@ -6,9 +6,19 @@ import com.linghy.env.Environment;
 import com.linghy.mods.curseforge.CurseForgeAPI;
 import com.linghy.mods.manifest.ModManifest;
 
+import javax.net.ssl.SSLContext;
+import javax.net.ssl.SSLParameters;
+import java.nio.charset.StandardCharsets;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.OutputStream;
+import java.net.URI;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
 import java.nio.file.*;
+import java.security.NoSuchAlgorithmException;
+import java.time.Duration;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
@@ -178,45 +188,255 @@ public class ModManager
         String fileName = file.fileName;
         Path outPath = modsDir.resolve(fileName);
 
+        String downloadUrl = file.downloadUrl;
+        if (downloadUrl.startsWith("http://")) {
+            downloadUrl = downloadUrl.replace("http://", "https://");
+            System.out.println("Forced HTTPS: " + downloadUrl);
+        }
+
+        if (!downloadUrl.startsWith("https://")) {
+            throw new IOException("Insecure connection: HTTPS required for mod downloads");
+        }
+
         System.out.println("=== Mod Download Start ===");
         System.out.println("File: " + fileName);
-        System.out.println("URL: " + file.downloadUrl);
+        System.out.println("URL: " + downloadUrl);
         System.out.println("Target: " + outPath);
 
         if (listener != null) {
-            listener.onProgress(0, "Initializing download...");
+            listener.onProgress(0, "Initializing secure download...");
         }
 
         try
         {
-            DownloadManager downloader = new DownloadManager(
-                    65536,
-                    5,
-                    3000
-            );
+            String userAgent = String.format("Linghy-Launcher/%s (Mod Manager)",
+                    Environment.getVersion());
 
-            com.linghy.model.ProgressCallback callback = (update) ->
+            SSLContext sslContext;
+            try {
+                sslContext = SSLContext.getInstance("TLSv1.3");
+                sslContext.init(null, null, null);
+            } catch (NoSuchAlgorithmException e)
             {
-                if (listener != null) {
-                    double percent = update.getProgress();
-                    String speed = update.getSpeed();
-                    String message = speed.isEmpty() ? "Downloading..." : speed;
+                try {
+                    sslContext = SSLContext.getInstance("TLSv1.2");
+                    sslContext.init(null, null, null);
+                    System.out.println("Using TLS 1.2 (TLS 1.3 not available)");
+                } catch (Exception ex) {
+                    throw new IOException("Failed to initialize secure SSL context", ex);
+                }
+            } catch (Exception e) {
+                throw new IOException("Failed to initialize secure SSL context", e);
+            }
 
-                    if (percent % 10 < 1) {
-                        System.out.println(String.format("Progress: %.1f%% - %s", percent, message));
+            SSLParameters sslParameters = new SSLParameters();
+            sslParameters.setProtocols(new String[]{"TLSv1.3", "TLSv1.2"});
+            sslParameters.setEndpointIdentificationAlgorithm("HTTPS");
+
+            HttpClient client = HttpClient.newBuilder()
+                    .sslContext(sslContext)
+                    .sslParameters(sslParameters)
+                    .connectTimeout(Duration.ofSeconds(30))
+                    .followRedirects(HttpClient.Redirect.ALWAYS)
+                    .build();
+
+            System.out.println("Secure SSL/TLS connection configured");
+            System.out.println("Certificate verification enabled");
+
+            HttpRequest.Builder requestBuilder = HttpRequest.newBuilder()
+                    .uri(URI.create(downloadUrl))
+                    .timeout(Duration.ofMinutes(5))
+                    .header("User-Agent", userAgent)
+                    .header("Accept", "*/*")
+                    .header("Accept-Language", "en-US,en;q=0.9")
+                    .header("Accept-Encoding", "identity")
+                    .GET();
+
+            String url = downloadUrl.toLowerCase();
+            boolean needsApiKey = url.contains("api.curseforge.com");
+
+            if (needsApiKey)
+            {
+                try {
+                    String apiKey = CurseForgeAPI.getApiKey();
+                    requestBuilder.header("x-api-key", apiKey);
+                    System.out.println("Using API key for CurseForge API request");
+                } catch (Exception e) {
+                    System.err.println("Failed to get API key: " + e.getMessage());
+                }
+            }
+            else
+            {
+                System.out.println("CDN download via secure HTTPS - API key not required");
+            }
+
+            HttpRequest request = requestBuilder.build();
+
+            System.out.println("Starting secure HTTPS download...");
+            System.out.println("Connecting to server...");
+
+            Path tempFile = outPath.resolveSibling(fileName + ".tmp");
+            Files.deleteIfExists(tempFile);
+
+            HttpResponse<InputStream> response;
+
+            long connectStart = System.currentTimeMillis();
+            try {
+                response = client.send(request, HttpResponse.BodyHandlers.ofInputStream());
+                long connectTime = System.currentTimeMillis() - connectStart;
+                System.out.println("Connected in " + connectTime + "ms");
+            } catch (java.net.ConnectException e) {
+                System.err.println("Connection failed: Cannot reach server");
+                throw new IOException("Cannot connect to download server. Check your internet connection or try again later.", e);
+            } catch (java.net.SocketTimeoutException e) {
+                System.err.println("Connection timeout: Server not responding");
+                throw new IOException("Connection timeout. The server is not responding. Check your internet connection.", e);
+            } catch (javax.net.ssl.SSLHandshakeException e) {
+                System.err.println("SSL Certificate verification failed!");
+                System.err.println("Certificate error: " + e.getMessage());
+                throw new IOException("SSL Certificate verification failed. The server certificate is invalid or untrusted.", e);
+            } catch (javax.net.ssl.SSLException e) {
+                System.err.println("SSL/TLS error occurred!");
+                System.err.println("SSL error: " + e.getMessage());
+                throw new IOException("Secure connection failed: " + e.getMessage(), e);
+            } catch (java.io.IOException e)
+            {
+                System.err.println("Network error: " + e.getMessage());
+                if (e.getMessage() != null)
+                {
+                    if (e.getMessage().contains("Connection reset")) {
+                        throw new IOException("Connection was reset by the server. The CDN might be blocking your connection.", e);
+                    } else if (e.getMessage().contains("Connection refused")) {
+                        throw new IOException("Connection refused. The server is not accepting connections.", e);
+                    }
+                }
+                throw new IOException("Network error during download: " + e.getMessage(), e);
+            }
+
+            System.out.println("Response status: " + response.statusCode());
+            System.out.println("SSL Certificate verified successfully");
+
+            System.out.println("Response headers:");
+            response.headers().map().forEach((key, values) -> {
+                if (key != null && !key.equalsIgnoreCase("set-cookie")) {
+                    System.out.println("  " + key + ": " + String.join(", ", values));
+                }
+            });
+
+            if (response.statusCode() == 403)
+            {
+                System.err.println("HTTP 403 Forbidden - Access denied");
+                System.err.println("This CDN may be blocked in your region or requires additional authentication.");
+                throw new IOException("Access denied (HTTP 403). The CDN may be blocked in your region. Try using a VPN.");
+            }
+
+            if (response.statusCode() != 200)
+            {
+                String errorMsg = "Server returned HTTP " + response.statusCode();
+
+                try (InputStream errorStream = response.body())
+                {
+                    byte[] errorBytes = errorStream.readAllBytes();
+                    if (errorBytes.length > 0 && errorBytes.length < 1024) {
+                        String errorBody = new String(errorBytes, StandardCharsets.UTF_8);
+                        System.err.println("Error body: " + errorBody);
+                        errorMsg += " - " + errorBody;
+                    }
+                } catch (Exception ignored) {}
+
+                throw new IOException(errorMsg);
+            }
+
+            long contentLength = response.headers()
+                    .firstValueAsLong("Content-Length")
+                    .orElse(-1);
+
+            System.out.println("Content length: " + (contentLength > 0 ? contentLength + " bytes (" + (contentLength / 1024 / 1024) + " MB)" : "unknown"));
+
+            if (contentLength <= 0) {
+                System.out.println("Warning: Content-Length not provided by server");
+            }
+
+            long downloaded = 0;
+            long startTime = System.currentTimeMillis();
+            long lastUpdate = startTime;
+            long lastLogTime = startTime;
+            final long UPDATE_INTERVAL_MS = 200;
+            final long LOG_INTERVAL_MS = 5000;
+
+            System.out.println("Starting download stream...");
+
+            try (InputStream in = response.body();
+                 OutputStream out = Files.newOutputStream(tempFile,
+                         StandardOpenOption.CREATE,
+                         StandardOpenOption.TRUNCATE_EXISTING))
+            {
+                byte[] buffer = new byte[65536];
+                int bytesRead;
+                int readCount = 0;
+
+                while ((bytesRead = in.read(buffer)) != -1)
+                {
+                    out.write(buffer, 0, bytesRead);
+                    downloaded += bytesRead;
+                    readCount++;
+
+                    long now = System.currentTimeMillis();
+
+                    if (now - lastLogTime > LOG_INTERVAL_MS)
+                    {
+                        double elapsed = (now - startTime) / 1000.0;
+                        double mbDownloaded = downloaded / 1024.0 / 1024.0;
+                        double speed = elapsed > 0 ? mbDownloaded / elapsed : 0;
+                        System.out.println(String.format("Download in progress: %.2f MB downloaded, %.2f MB/s, %d reads",
+                                mbDownloaded, speed, readCount));
+                        lastLogTime = now;
                     }
 
-                    listener.onProgress(percent, message);
+                    if (listener != null && (now - lastUpdate > UPDATE_INTERVAL_MS))
+                    {
+                        double percent = contentLength > 0 ? (downloaded * 100.0 / contentLength) : 0;
+                        double elapsed = (now - startTime) / 1000.0;
+                        String speed = elapsed > 0
+                                ? String.format("%.2f MB/s", downloaded / 1024.0 / 1024.0 / elapsed)
+                                : "";
+
+                        listener.onProgress(percent, speed);
+                        lastUpdate = now;
+                    }
                 }
-            };
 
-            System.out.println("Starting download with HttpClient...");
-            String targetUrl = file.downloadUrl;
-//                    .replace("edge.forgecdn.net", "mediafilez.forgecdn.net");
+                System.out.println("Download stream completed");
+            } catch (java.net.SocketTimeoutException e) {
+                System.err.println("Read timeout during download");
+                throw new IOException("Download interrupted: Read timeout. The connection was too slow or stalled.", e);
+            } catch (java.io.IOException e) {
+                System.err.println("IO error during download: " + e.getMessage());
+                throw new IOException("Download interrupted: " + e.getMessage(), e);
+            }
 
-            downloader.downloadWithNIO(targetUrl, outPath, callback);
+            long actualSize = Files.size(tempFile);
+            System.out.println("Downloaded: " + actualSize + " bytes (" + (actualSize / 1024 / 1024) + " MB)");
 
-            System.out.println("Download completed successfully");
+            if (actualSize == 0) {
+                Files.deleteIfExists(tempFile);
+                throw new IOException("Downloaded file is empty (0 bytes)");
+            }
+
+            if (contentLength > 0 && actualSize != contentLength) {
+                Files.deleteIfExists(tempFile);
+                throw new IOException("Incomplete download: expected " + contentLength +
+                        " bytes, got " + actualSize + " (missing " + (contentLength - actualSize) + " bytes)");
+            }
+
+            Files.move(tempFile, outPath,
+                    StandardCopyOption.REPLACE_EXISTING,
+                    StandardCopyOption.ATOMIC_MOVE);
+
+            double totalTime = (System.currentTimeMillis() - startTime) / 1000.0;
+            double avgSpeed = (actualSize / 1024.0 / 1024.0) / totalTime;
+            System.out.println(String.format("✓ Secure HTTPS download completed successfully in %.1fs (avg %.2f MB/s)",
+                    totalTime, avgSpeed));
 
             if (listener != null) {
                 listener.onProgress(100, "Installing...");
@@ -247,6 +467,7 @@ public class ModManager
 
             try {
                 Files.deleteIfExists(outPath);
+                Files.deleteIfExists(outPath.resolveSibling(fileName + ".tmp"));
                 System.out.println("Cleaned up incomplete file");
             } catch (IOException ex) {
                 System.err.println("Failed to delete incomplete file: " + ex.getMessage());

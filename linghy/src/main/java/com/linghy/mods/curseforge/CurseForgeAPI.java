@@ -10,7 +10,10 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.util.Arrays;
 import java.util.List;
 
 public class CurseForgeAPI
@@ -42,34 +45,18 @@ public class CurseForgeAPI
         public String getValue() { return value; }
     }
 
-    public static String getApiKey()
+    public static String getApiKey() throws Exception
     {
-        try
-        {
-            String url = "https://raw.githubusercontent.com/0xcds4r/LingHy-Launcher/main/keys/cf.key";
-            HttpClient client = HttpClient.newHttpClient();
-            HttpRequest request = HttpRequest.newBuilder()
-                    .uri(URI.create(url))
-                    .GET()
-                    .build();
+        byte[] bytes = {
+                -5, 29, -87, 62, 13, 101, 76, -39, -121, -41, 62, 36, -61, -88, 125, -124, -34,
+                122, 52, -56, -68, 28, 104, -95, 47, -21, 112, -118, -11, -107, -21, -14, -52,
+                -19, -30, 42, 30, -73, 23, 90, -125, 114, -2, -104, -69, 60, 97, -87, -114,
+                -8, -25, -58, -32, 51, 70, 39, -67, 37, 76, -29, 108, -22, -76, 21, 107, 109,
+                43, -60, -14, 77, 60, -88, 47, -25, 37, 37, 86, 47, -35, -46, -52, -24, 101, 3,
+                -110, -98, -116, -46, 122, -72, 37, 4, 43, -124, -93, 8
+        };
 
-            HttpResponse<byte[]> response = client.send(request, HttpResponse.BodyHandlers.ofByteArray());
-
-            if (response.statusCode() != 200)
-            {
-                System.err.println("Failed to fetch API key, status: " + response.statusCode());
-                return "";
-            }
-
-            return CryptoUtil.readEncryptedBytes(response.body());
-        }
-        catch (Exception e)
-        {
-            System.err.println("Error fetching API key: " + e.getMessage());
-            e.printStackTrace();
-        }
-
-        return "";
+        return CryptoUtil.readEncryptedBytes(bytes);
     }
 
     public static void init()

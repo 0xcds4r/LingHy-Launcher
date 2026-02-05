@@ -1,5 +1,6 @@
 package com.linghy.mods;
 
+import com.linghy.launcher.SettingsDialog;
 import com.linghy.mods.curseforge.CurseForgeAPI;
 
 import javax.swing.*;
@@ -7,11 +8,15 @@ import javax.swing.Timer;
 import javax.swing.border.EmptyBorder;
 import java.awt.*;
 import java.awt.datatransfer.DataFlavor;
+import java.awt.datatransfer.StringSelection;
 import java.awt.datatransfer.Transferable;
 import java.awt.dnd.*;
 import java.awt.event.*;
+import java.io.BufferedReader;
 import java.io.File;
 import java.io.IOException;
+import java.io.InputStreamReader;
+import java.net.HttpURLConnection;
 import java.net.URL;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -20,6 +25,7 @@ import java.util.*;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.prefs.Preferences;
 
 public class ModManagerDialog extends JDialog
 {
@@ -57,6 +63,10 @@ public class ModManagerDialog extends JDialog
 
         initComponents();
         loadInstalledMods();
+
+        if (isUserInRussia()) {
+            SwingUtilities.invokeLater(this::showRussiaWarningDialog);
+        }
 
         tabbedPane.addChangeListener(e ->
         {
@@ -138,7 +148,7 @@ public class ModManagerDialog extends JDialog
             }
             catch (IOException e)
             {
-                System.err.println("Failed to copy mod: " + file.getName() + " → " + e.getMessage());
+                System.err.println("Failed to copy mod: " + file.getName() + " -> " + e.getMessage());
                 failed.add(file.getName());
             }
         }
@@ -182,6 +192,159 @@ public class ModManagerDialog extends JDialog
 
             importJarFiles(Arrays.asList(selectedFiles));
         }
+    }
+
+    private void showRussiaWarningDialog()
+    {
+        if (SettingsDialog.getSettingValue(SettingsDialog.KEY_RKN_WARNING, false)) {
+            return;
+        }
+
+        String fullMessage = """
+        ВНИМАНИЕ! Серьёзные проблемы с CurseForge в России прямо сейчас (февраль 2026)
+
+        Роскомнадзор — это помойное цензурное ведомство — уже больше полугода (с июня 2025) целенаправленно душит Cloudflare, через который работает почти весь CurseForge (скачивание модов, обновления, Forge/CDN и т.д.).
+
+        Что происходит на практике:
+        • файлы модов скачиваются максимум 16 килобайт и виснут навсегда
+        • таймауты, ошибки соединения каждые 5 секунд
+        • CurseForge Launcher либо не запускается, либо не может ничего загрузить
+        • обновления модпаков практически невозможны без танцев с бубном
+
+        Это НЕ баг, НЕ проблема CurseForge и НЕ ваш интернет-провайдер.
+        Это тупая, вредительская, бессмысленная цензура от РКН, которая ломает нормальную жизнь тысячам геймеров.
+
+        Чтобы хоть как-то играть и собирать моды — БЕЗ ВАРИАНТОВ нужно обходить эту херню:
+
+        1. Запускайте нормальный VPN (ProtonVPN free, Mullvad, Amnezia, Outline — что угодно, лишь бы не российский)
+        2. Самый эффективный и лёгкий способ для CurseForge → программа **zapret** (winws.exe):
+           - https://github.com/bol-van/zapret
+           - добавьте в list-general следующие домены:
+           - curseforge.com
+           - forgecdn.net
+           - mediafilez.forgecdn.net
+           - cloudfront.net
+           - запустите — и моды полетят на нормальной скорости
+        3. GoodbyeDPI + список хостов тоже работает, но zapret сейчас надёжнее
+
+        Без обхода — ничего качаться не будет. Точка.
+
+        Россиянам приходится тратить время и нервы, чтобы обходить идиотские запреты ради того, чтобы просто поиграть в игры.
+        Держитесь. И качайте моды в обход этой цензурной помойки.
+
+        Удачи и крепких нервов!
+        
+        (( ЕСЛИ ВЫ ПОЛУЧИЛИ ЭТО УВЕДОМЛЕНИЕ ПО ОШИБКЕ, ВЕРОЯТНО НАША СИСТЕМА ПОСЧИТАЛО ВАШ РЕГИОН ЗА РОССИЙСКИЙ, ПРОСТО ОТКЛЮЧИТЕ УВЕДОМЛЕНИЕ ))
+        """;
+
+        String domainsToCopy = """
+        curseforge.com\n
+        forgecdn.net\n
+        mediafilez.forgecdn.net\n
+        cloudfront.net
+        """;
+
+        JCheckBox dontShowCheckBox = new JCheckBox("Больше не показывать это сообщение");
+        dontShowCheckBox.setFont(new Font("Segoe UI", Font.PLAIN, 13));
+        dontShowCheckBox.setForeground(new Color(220, 220, 220));
+        dontShowCheckBox.setBackground(new Color(30, 30, 35));
+        dontShowCheckBox.setFocusPainted(false);
+
+        JButton copyButton = new JButton("Скопировать домены для zapret");
+        copyButton.setFont(new Font("Segoe UI", Font.BOLD, 13));
+        copyButton.setForeground(Color.WHITE);
+        copyButton.setBackground(new Color(16, 185, 129, 180));
+        copyButton.setFocusPainted(false);
+        copyButton.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+
+        copyButton.addActionListener(e ->
+        {
+            StringSelection selection = new StringSelection(domainsToCopy);
+            Toolkit.getDefaultToolkit().getSystemClipboard().setContents(selection, null);
+
+            String originalText = copyButton.getText();
+            copyButton.setText("Скопировано!");
+            copyButton.setEnabled(false);
+
+            new javax.swing.Timer(1800, ev -> {
+                copyButton.setText(originalText);
+                copyButton.setEnabled(true);
+            }).start();
+        });
+
+        JTextArea textArea = new JTextArea(fullMessage);
+        textArea.setEditable(false);
+        textArea.setLineWrap(true);
+        textArea.setWrapStyleWord(true);
+        textArea.setFont(new Font("Segoe UI", Font.PLAIN, 13));
+        textArea.setBackground(new Color(26, 26, 32));
+        textArea.setForeground(new Color(240, 240, 240));
+        textArea.setBorder(new EmptyBorder(10, 12, 10, 12));
+
+        JScrollPane scrollPane = new JScrollPane(textArea);
+        scrollPane.setPreferredSize(new Dimension(640, 360));
+        scrollPane.setBorder(BorderFactory.createLineBorder(new Color(80, 80, 90)));
+
+        JPanel bottomPanel = new JPanel(new BorderLayout(12, 0));
+        bottomPanel.setOpaque(false);
+        bottomPanel.add(dontShowCheckBox, BorderLayout.WEST);
+        bottomPanel.add(copyButton, BorderLayout.EAST);
+
+        JPanel mainPanel = new JPanel(new BorderLayout(0, 12));
+        mainPanel.setBackground(new Color(26, 26, 32));
+        mainPanel.setBorder(new EmptyBorder(15, 15, 15, 15));
+        mainPanel.add(scrollPane, BorderLayout.CENTER);
+        mainPanel.add(bottomPanel, BorderLayout.SOUTH);
+
+        JOptionPane.showOptionDialog(
+                this,
+                mainPanel,
+                "Внимание!",
+                JOptionPane.DEFAULT_OPTION,
+                JOptionPane.ERROR_MESSAGE,
+                null,
+                new String[]{"Понял"},
+                "Понял"
+        );
+
+        if (dontShowCheckBox.isSelected()) {
+            SettingsDialog.setSettingValue(SettingsDialog.KEY_RKN_WARNING, true);
+        }
+    }
+
+    private boolean isUserInRussia()
+    {
+        Locale locale = Locale.getDefault();
+        String country = locale.getCountry().toUpperCase();
+        if ("RU".equals(country) || "RU".equals(locale.getLanguage().toUpperCase())) {
+            return true;
+        }
+
+        try {
+            URL url = new URL("http://ip-api.com/json/?fields=countryCode,status");
+            HttpURLConnection conn = (HttpURLConnection) url.openConnection();
+            conn.setConnectTimeout(5000);
+            conn.setReadTimeout(5000);
+            conn.setRequestMethod("GET");
+
+            if (conn.getResponseCode() == 200) {
+                try (BufferedReader reader = new BufferedReader(new InputStreamReader(conn.getInputStream()))) {
+                    StringBuilder json = new StringBuilder();
+                    String line;
+                    while ((line = reader.readLine()) != null) {
+                        json.append(line);
+                    }
+                    String response = json.toString();
+                    if (response.contains("\"status\":\"success\"") && response.contains("\"countryCode\":\"RU\"")) {
+                        return true;
+                    }
+                }
+            }
+        } catch (Exception ignored) {
+
+        }
+
+        return false;
     }
 
     private JPanel createCurseForgePanel()
@@ -859,7 +1022,7 @@ public class ModManagerDialog extends JDialog
         JPanel controls = new JPanel(new FlowLayout(FlowLayout.RIGHT, 5, 0));
         controls.setOpaque(false);
 
-        checkUpdatesButton = createHeaderButton("↻");
+        checkUpdatesButton = createHeaderButton("R");
         checkUpdatesButton.setToolTipText("Check for updates");
         checkUpdatesButton.addActionListener(e -> checkForUpdates());
 

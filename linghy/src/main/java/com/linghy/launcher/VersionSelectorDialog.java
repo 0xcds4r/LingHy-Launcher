@@ -59,7 +59,7 @@ public class VersionSelectorDialog extends JDialog
         JPanel windowControls = new JPanel(new FlowLayout(FlowLayout.RIGHT, 5, 0));
         windowControls.setOpaque(false);
 
-        refreshButton = createWindowButton("↻");
+        refreshButton = createWindowButton("R");
         refreshButton.setToolTipText("Refresh versions list");
         refreshButton.addActionListener(e -> refreshVersions());
 
@@ -600,7 +600,7 @@ public class VersionSelectorDialog extends JDialog
             if (value instanceof GameVersion version)
             {
                 String installedBadge = version.isInstalled()
-                        ? "<span style='color:#90EE90;'>✓ Installed</span>"
+                        ? "<span style='color:#90EE90;'>Installed</span>"
                         : "<span style='color:#666;'>Not installed</span>";
 
                 String branchBadge = version.isPreRelease()

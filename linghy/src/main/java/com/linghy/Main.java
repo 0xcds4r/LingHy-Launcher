@@ -4,7 +4,9 @@ import com.formdev.flatlaf.FlatDarkLaf;
 import com.linghy.env.Cleanup;
 import com.linghy.env.Environment;
 import com.linghy.launcher.LauncherFrame;
+import com.linghy.model.GameSession;
 import com.linghy.mods.curseforge.CurseForgeAPI;
+import com.linghy.service.AuthService;
 import com.linghy.utils.AffinityMgr;
 
 import javax.swing.*;
@@ -141,7 +143,7 @@ public class Main
                     }
                 }
 
-                System.out.printf("-> Processing mod installation → modId = %d, fileId = %s%n",
+                System.out.printf("-> Processing mod installation -> modId = %d, fileId = %s%n",
                         modId,
                         specificFileId != null ? specificFileId : "latest (most recent)");
 
@@ -171,7 +173,7 @@ public class Main
         {
             System.err.println("Error processing curseforge:// URI:");
             System.err.println("  URI: " + uri);
-            System.err.println("  Error: " + e.getClass().getSimpleName() + " → " + e.getMessage());
+            System.err.println("  Error: " + e.getClass().getSimpleName() + " -> " + e.getMessage());
 
             e.printStackTrace();
         }
