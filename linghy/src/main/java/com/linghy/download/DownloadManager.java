@@ -76,7 +76,7 @@ public class DownloadManager
 
                 URL urlObj = new URL(url);
                 HttpURLConnection connection = (HttpURLConnection) urlObj.openConnection();
-                connection.setRequestProperty("User-Agent", "Mozilla/5.0 (LingHy-Launcher)");
+                connection.setRequestProperty("User-Agent", "LingHy-Launcher/1.0");
                 connection.setInstanceFollowRedirects(true);
                 connection.setConnectTimeout(60000);
                 connection.setReadTimeout(60000);
@@ -89,7 +89,7 @@ public class DownloadManager
                     String newUrl = connection.getHeaderField("Location");
                     connection.disconnect();
                     connection = (HttpURLConnection) new URL(newUrl).openConnection();
-                    connection.setRequestProperty("User-Agent", "Mozilla/5.0 (LingHy-Launcher)");
+                    connection.setRequestProperty("User-Agent", "LingHy-Launcher/1.0");
                     connection.setInstanceFollowRedirects(true);
                     connection.setConnectTimeout(60000);
                     connection.setReadTimeout(60000);
@@ -209,7 +209,7 @@ public class DownloadManager
                 HttpRequest request = HttpRequest.newBuilder()
                         .uri(URI.create(url))
                         .timeout(Duration.ofMinutes(5))
-                        .header("User-Agent", "Mozilla/5.0 (LingHy-Launcher)")
+                        .header("User-Agent", "LingHy-Launcher/1.0")
                         .header("Accept", "*/*")
                         .GET()
                         .build();

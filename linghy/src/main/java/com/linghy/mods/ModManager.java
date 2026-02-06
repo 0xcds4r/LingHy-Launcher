@@ -209,7 +209,7 @@ public class ModManager
 
         try
         {
-            String userAgent = String.format("Linghy-Launcher/%s (Mod Manager)",
+            String userAgent = String.format("Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36",
                     Environment.getVersion());
 
             SSLContext sslContext;
@@ -291,6 +291,9 @@ public class ModManager
             } catch (java.net.SocketTimeoutException e) {
                 System.err.println("Connection timeout: Server not responding");
                 throw new IOException("Connection timeout. The server is not responding. Check your internet connection.", e);
+            } catch (java.net.http.HttpConnectTimeoutException e) {
+                System.err.println("HTTP connect timeout: Server not responding");
+                throw new IOException("Connection timeout. The server is not responding. This may be due to network issues or server being blocked.", e);
             } catch (javax.net.ssl.SSLHandshakeException e) {
                 System.err.println("SSL Certificate verification failed!");
                 System.err.println("Certificate error: " + e.getMessage());
@@ -435,7 +438,7 @@ public class ModManager
 
             double totalTime = (System.currentTimeMillis() - startTime) / 1000.0;
             double avgSpeed = (actualSize / 1024.0 / 1024.0) / totalTime;
-            System.out.println(String.format("✓ Secure HTTPS download completed successfully in %.1fs (avg %.2f MB/s)",
+            System.out.println(String.format("Secure HTTPS download completed successfully in %.1fs (avg %.2f MB/s)",
                     totalTime, avgSpeed));
 
             if (listener != null) {
@@ -458,12 +461,27 @@ public class ModManager
 
             System.out.println("=== Mod Download Complete ===");
         }
-        catch (Exception e)
+        catch (IOException e)
         {
             System.err.println("=== Mod Download Failed ===");
             System.err.println("Error: " + e.getClass().getSimpleName());
             System.err.println("Message: " + e.getMessage());
-            e.printStackTrace();
+
+            try {
+                Files.deleteIfExists(outPath);
+                Files.deleteIfExists(outPath.resolveSibling(fileName + ".tmp"));
+                System.out.println("Cleaned up incomplete file");
+            } catch (IOException ex) {
+                System.err.println("Failed to delete incomplete file: " + ex.getMessage());
+            }
+
+            throw e;
+        }
+        catch (Exception e)
+        {
+            System.err.println("=== Mod Download Failed ===");
+            System.err.println("Unexpected error: " + e.getClass().getSimpleName());
+            System.err.println("Message: " + e.getMessage());
 
             try {
                 Files.deleteIfExists(outPath);

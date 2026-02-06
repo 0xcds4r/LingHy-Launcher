@@ -2,6 +2,9 @@ package com.linghy.mods;
 
 import com.linghy.launcher.SettingsDialog;
 import com.linghy.mods.curseforge.CurseForgeAPI;
+import com.linghy.version.GameVersion;
+import com.linghy.version.VersionManager;
+import com.linghy.env.Environment;
 
 import javax.swing.*;
 import javax.swing.Timer;
@@ -12,20 +15,18 @@ import java.awt.datatransfer.StringSelection;
 import java.awt.datatransfer.Transferable;
 import java.awt.dnd.*;
 import java.awt.event.*;
-import java.io.BufferedReader;
-import java.io.File;
-import java.io.IOException;
-import java.io.InputStreamReader;
+import java.io.*;
 import java.net.HttpURLConnection;
 import java.net.URL;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.StandardCopyOption;
+import java.nio.file.*;
+import java.nio.file.attribute.BasicFileAttributes;
+import java.time.Instant;
 import java.util.*;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.prefs.Preferences;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipFile;
 
 public class ModManagerDialog extends JDialog
 {
@@ -38,7 +39,7 @@ public class ModManagerDialog extends JDialog
     private JButton deleteButton;
     private JButton checkUpdatesButton;
 
-    private JLabel statusLabel;
+    public JLabel statusLabel;
 
     private JTextField cfSearchField;
     private DefaultListModel<CurseForgeAPI.Mod> cfModel;
@@ -46,16 +47,18 @@ public class ModManagerDialog extends JDialog
     private JButton cfDownloadButton;
     private JButton cfInfoButton;
     private JComboBox<String> cfSortCombo;
-    private JLabel cfStatusLabel;
-    private JProgressBar cfProgressBar;
+    public JLabel cfStatusLabel;
+    public JProgressBar cfProgressBar;
     private volatile boolean isSearching = false;
     private boolean hasLoadedPopularMods = false;
+    private GameVersion selectedGameVersion;
 
-    public ModManagerDialog(Frame parent)
+    public ModManagerDialog(Frame parent, GameVersion selectedVersion)
     {
         super(parent, "Mod Manager", true);
 
         this.modManager = new ModManager();
+        this.selectedGameVersion = selectedVersion;
 
         setSize(1100, 700);
         setLocationRelativeTo(parent);
@@ -101,8 +104,481 @@ public class ModManagerDialog extends JDialog
         JPanel bottomPanel = createBottomPanel();
         mainPanel.add(bottomPanel, BorderLayout.SOUTH);
 
+        JPanel advancedPanel = createAdvancedPanel();
+        tabbedPane.addTab("Translations", advancedPanel);
+
         setContentPane(mainPanel);
         addWindowDragListener();
+    }
+
+    private List<String> getPackedResources()
+    {
+        List<String> zips = new ArrayList<>();
+
+        String[] possible = {
+                "russian_translations.packed"
+        };
+
+        for (String name : possible) {
+            if (getClass().getResource("/" + name) != null) {
+                zips.add(name);
+            }
+        }
+
+        return zips;
+    }
+
+    private void loadPackedResourcesFromClasspath(DefaultListModel<String> model)
+    {
+        model.clear();
+        int foundCount = 0;
+
+        for (String fileName : getPackedResources())
+        {
+            URL resource = getClass().getResource("/" + fileName);
+            if (resource != null) {
+                model.addElement(fileName);
+                foundCount++;
+            }
+        }
+
+        if (foundCount == 0) {
+            model.addElement("EMPTY");
+        }
+    }
+
+    private JPanel createAdvancedPanel()
+    {
+        JPanel panel = new JPanel(new BorderLayout(10, 10));
+        panel.setBackground(new Color(18, 18, 18));
+        panel.setBorder(new EmptyBorder(15, 15, 15, 15));
+
+        JPanel topPanel = new JPanel(new BorderLayout(10, 0));
+        topPanel.setOpaque(false);
+
+        JTextField searchField = new JTextField();
+        searchField.setBackground(new Color(26, 26, 32));
+        searchField.setForeground(Color.WHITE);
+        searchField.setCaretColor(new Color(255, 168, 69));
+        searchField.setFont(new Font("Segoe UI", Font.PLAIN, 14));
+        searchField.setBorder(BorderFactory.createCompoundBorder(
+                BorderFactory.createLineBorder(new Color(255, 168, 69, 60), 1),
+                new EmptyBorder(10, 15, 10, 15)
+        ));
+        searchField.setToolTipText("Filter resources by name");
+
+        JButton installButton = createStyledButton("Install");
+        installButton.setBackground(new Color(16, 185, 129, 180));
+        installButton.setPreferredSize(new Dimension(130, 38));
+        installButton.setEnabled(false);
+
+        topPanel.add(searchField, BorderLayout.CENTER);
+        topPanel.add(installButton, BorderLayout.EAST);
+
+        panel.add(topPanel, BorderLayout.NORTH);
+
+        DefaultListModel<String> resourceModel = new DefaultListModel<>();
+        JList<String> resourceList = new JList<>(resourceModel);
+        resourceList.setBackground(new Color(26, 26, 32));
+        resourceList.setForeground(Color.WHITE);
+        resourceList.setFont(new Font("Segoe UI", Font.PLAIN, 13));
+        resourceList.setCellRenderer(new ResourceRenderer());
+        resourceList.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
+        resourceList.setFixedCellHeight(60);
+
+        loadPackedResourcesFromClasspath(resourceModel);
+
+        installButton.addActionListener(e -> {
+            String selected = resourceList.getSelectedValue();
+            if (selected != null && !"EMPTY".equals(selected)) {
+                installPackedResource(selected);
+            }
+        });
+
+        searchField.addKeyListener(new KeyAdapter()
+        {
+            @Override
+            public void keyReleased(KeyEvent e) {
+                String filter = searchField.getText().toLowerCase().trim();
+                resourceModel.clear();
+
+                List<String> allZips = getPackedResources();
+                for (String zip : allZips) {
+                    if (filter.isEmpty() || zip.toLowerCase().contains(filter)) {
+                        resourceModel.addElement(zip);
+                    }
+                }
+
+                if (resourceModel.isEmpty()) {
+                    resourceModel.addElement("EMPTY");
+                }
+
+                statusLabel.setText("Showed " + resourceModel.size() + " from " + allZips.size() + " resources");
+            }
+        });
+
+        resourceList.addListSelectionListener(e -> {
+            if (!e.getValueIsAdjusting()) {
+                String selected = resourceList.getSelectedValue();
+                installButton.setEnabled(selected != null && !"EMPTY".equals(selected));
+            }
+        });
+
+        resourceList.addMouseListener(new MouseAdapter()
+        {
+            @Override
+            public void mouseClicked(MouseEvent e) {
+                if (e.getClickCount() == 2) {
+                    String selected = resourceList.getSelectedValue();
+                    if (selected != null && !"EMPTY".equals(selected)) {
+                        installPackedResource(selected);
+                    }
+                }
+            }
+        });
+
+        JScrollPane scrollPane = new JScrollPane(resourceList);
+        scrollPane.setBorder(BorderFactory.createLineBorder(new Color(255, 168, 69, 60), 1));
+        scrollPane.getViewport().setBackground(new Color(26, 26, 32));
+        customizeScrollBar(scrollPane);
+
+        panel.add(scrollPane, BorderLayout.CENTER);
+
+        JLabel hintLabel = new JLabel(
+                "Select the translation and click Install or double-click. Requires game version to be installed.",
+                SwingConstants.CENTER
+        );
+        hintLabel.setFont(new Font("Segoe UI", Font.ITALIC, 12));
+        hintLabel.setForeground(new Color(140, 140, 160));
+        hintLabel.setBorder(new EmptyBorder(8, 0, 12, 0));
+
+        panel.add(hintLabel, BorderLayout.SOUTH);
+
+        return panel;
+    }
+
+    private void installPackedResource(String resourceName)
+    {
+        GameVersion selectedVersion = getSelectedGameVersion();
+
+        if (selectedVersion == null)
+        {
+            JOptionPane.showMessageDialog(this,
+                    "Please select a game version first.\n" +
+                            "Close this dialog and select a version from the main launcher.",
+                    "No Version Selected",
+                    JOptionPane.WARNING_MESSAGE);
+            return;
+        }
+
+        VersionManager versionManager = new VersionManager();
+
+        if (!versionManager.isVersionInstalled(selectedVersion.getPatchNumber(), selectedVersion.getBranch()))
+        {
+            JOptionPane.showMessageDialog(this,
+                    "Selected version '" + selectedVersion.getName() + "' is not installed.\n" +
+                            "Please install the game version first.",
+                    "Version Not Installed",
+                    JOptionPane.WARNING_MESSAGE);
+            return;
+        }
+
+        int confirm = JOptionPane.showConfirmDialog(this,
+                "Install '" + resourceName + "' to game version:\n" +
+                        selectedVersion.getName() + "\n\n" +
+                        "This will replace files in the Client directory.\n" +
+                        "A backup will be created automatically.\n\n" +
+                        "Continue?",
+                "Confirm Installation",
+                JOptionPane.YES_NO_OPTION,
+                JOptionPane.QUESTION_MESSAGE);
+
+        if (confirm != JOptionPane.YES_OPTION) {
+            return;
+        }
+
+        JDialog progressDialog = new JDialog(this, "Installing Resource", true);
+        progressDialog.setSize(450, 180);
+        progressDialog.setLocationRelativeTo(this);
+        progressDialog.setUndecorated(true);
+
+        JPanel progressPanel = new JPanel(new BorderLayout(10, 10));
+        progressPanel.setBackground(new Color(18, 18, 18));
+        progressPanel.setBorder(BorderFactory.createCompoundBorder(
+                BorderFactory.createLineBorder(new Color(255, 168, 69, 100), 2),
+                new EmptyBorder(20, 20, 20, 20)
+        ));
+
+        JLabel progressLabel = new JLabel("Preparing installation...");
+        progressLabel.setForeground(Color.WHITE);
+        progressLabel.setFont(new Font("Segoe UI", Font.PLAIN, 14));
+        progressLabel.setHorizontalAlignment(SwingConstants.CENTER);
+
+        JProgressBar progressBar = new JProgressBar();
+        progressBar.setIndeterminate(true);
+        progressBar.setBackground(new Color(30, 30, 30));
+        progressBar.setForeground(new Color(255, 168, 69));
+        progressBar.setPreferredSize(new Dimension(400, 25));
+
+        progressPanel.add(progressLabel, BorderLayout.NORTH);
+        progressPanel.add(progressBar, BorderLayout.CENTER);
+
+        progressDialog.setContentPane(progressPanel);
+
+        SwingWorker<String, String> worker = new SwingWorker<>()
+        {
+            @Override
+            protected String doInBackground() throws Exception
+            {
+                publish("Locating game directory...");
+
+                Path gameDir = versionManager.getVersionDirectory(
+                        selectedVersion.getPatchNumber(),
+                        selectedVersion.getBranch()
+                );
+
+                if (!Files.exists(gameDir))
+                {
+                    throw new IOException("Client directory not found: " + gameDir);
+                }
+
+                publish("Creating backup of Client directory...");
+                String timestamp = String.valueOf(System.currentTimeMillis());
+                Path backupDir = gameDir.resolve("Client.backup." + timestamp);
+
+                copyDirectory(gameDir, backupDir);
+                publish("Backup created: " + backupDir.getFileName());
+
+                try
+                {
+                    publish("Reading packed resource from jar...");
+                    InputStream resourceStream = getClass().getResourceAsStream("/" + resourceName);
+
+                    if (resourceStream == null) {
+                        throw new IOException("Resource not found in jar: " + resourceName);
+                    }
+
+                    Path tempZip = Files.createTempFile("packed_resource_", ".zip");
+
+                    try
+                    {
+                        publish("Extracting resource...");
+                        Files.copy(resourceStream, tempZip, StandardCopyOption.REPLACE_EXISTING);
+                        resourceStream.close();
+
+                        publish("Unpacking files...");
+
+                        Path tempExtractDir = Files.createTempDirectory("packed_extract_");
+
+                        try
+                        {
+                            extractZipFile(tempZip, tempExtractDir);
+
+                            publish("Installing files to Client directory...");
+                            copyDirectoryContents(tempExtractDir, gameDir);
+
+                            publish("Cleaning up temporary files...");
+                        }
+                        finally
+                        {
+                            deleteDirectory(tempExtractDir);
+                        }
+                    }
+                    finally
+                    {
+                        Files.deleteIfExists(tempZip);
+                    }
+
+                    return "Installation complete!\nBackup saved: " + backupDir.getFileName();
+                }
+                catch (Exception e)
+                {
+                    publish("Error occurred! Restoring from backup...");
+
+                    try {
+                        deleteDirectory(gameDir);
+                        Files.move(backupDir, gameDir, StandardCopyOption.REPLACE_EXISTING);
+                        publish("Backup restored successfully");
+                    } catch (Exception restoreError) {
+                        throw new IOException("Failed to restore backup: " + restoreError.getMessage(), e);
+                    }
+
+                    throw e;
+                }
+            }
+
+            @Override
+            protected void process(List<String> chunks)
+            {
+                if (!chunks.isEmpty()) {
+                    String message = chunks.get(chunks.size() - 1);
+                    progressLabel.setText(message);
+                    statusLabel.setText(message);
+                }
+            }
+
+            @Override
+            protected void done()
+            {
+                progressDialog.dispose();
+
+                try
+                {
+                    String result = get();
+
+                    statusLabel.setText("Resource installed successfully");
+
+                    JOptionPane.showMessageDialog(
+                            ModManagerDialog.this,
+                            "Successfully installed: " + resourceName + "\n\n" +
+                                    "Game version: " + selectedVersion.getName() + "\n" +
+                                    result,
+                            "Installation Complete",
+                            JOptionPane.INFORMATION_MESSAGE);
+                }
+                catch (Exception e)
+                {
+                    e.printStackTrace();
+                    statusLabel.setText("Installation failed: " + e.getMessage());
+
+                    String errorMsg = e.getMessage();
+                    Throwable cause = e.getCause();
+                    if (cause != null && cause.getMessage() != null) {
+                        errorMsg += "\n\nDetails: " + cause.getMessage();
+                    }
+
+                    JOptionPane.showMessageDialog(
+                            ModManagerDialog.this,
+                            "Failed to install resource:\n\n" + errorMsg,
+                            "Installation Error",
+                            JOptionPane.ERROR_MESSAGE);
+                }
+            }
+        };
+
+        worker.execute();
+        progressDialog.setVisible(true);
+    }
+
+    private void extractZipFile(Path zipFile, Path destDir) throws IOException
+    {
+        try (java.util.zip.ZipFile zip = new java.util.zip.ZipFile(zipFile.toFile()))
+        {
+            java.util.Enumeration<? extends java.util.zip.ZipEntry> entries = zip.entries();
+
+            while (entries.hasMoreElements())
+            {
+                java.util.zip.ZipEntry entry = entries.nextElement();
+                Path filePath = destDir.resolve(entry.getName()).normalize();
+
+                if (!filePath.startsWith(destDir)) {
+                    throw new IOException("Invalid zip entry (path traversal attempt): " + entry.getName());
+                }
+
+                if (entry.isDirectory())
+                {
+                    Files.createDirectories(filePath);
+                }
+                else
+                {
+                    Files.createDirectories(filePath.getParent());
+
+                    try (InputStream in = zip.getInputStream(entry);
+                         OutputStream out = Files.newOutputStream(filePath,
+                                 StandardOpenOption.CREATE,
+                                 StandardOpenOption.TRUNCATE_EXISTING))
+                    {
+                        byte[] buffer = new byte[8192];
+                        int len;
+                        while ((len = in.read(buffer)) > 0) {
+                            out.write(buffer, 0, len);
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    private GameVersion getSelectedGameVersion() {
+        return selectedGameVersion;
+    }
+
+    private void copyDirectory(Path source, Path target) throws IOException
+    {
+        Files.walk(source).forEach(sourcePath ->
+        {
+            try
+            {
+                Path targetPath = target.resolve(source.relativize(sourcePath));
+
+                if (Files.isDirectory(sourcePath))
+                {
+                    Files.createDirectories(targetPath);
+                }
+                else
+                {
+                    Files.createDirectories(targetPath.getParent());
+                    Files.copy(sourcePath, targetPath,
+                            StandardCopyOption.REPLACE_EXISTING,
+                            StandardCopyOption.COPY_ATTRIBUTES);
+                }
+            }
+            catch (IOException e)
+            {
+                throw new RuntimeException("Failed to copy: " + sourcePath, e);
+            }
+        });
+    }
+
+    private void copyDirectoryContents(Path source, Path target) throws IOException
+    {
+        Files.walk(source).forEach(sourcePath ->
+        {
+            try
+            {
+                Path relativePath = source.relativize(sourcePath);
+
+                if (relativePath.toString().isEmpty()) {
+                    return;
+                }
+
+                Path targetPath = target.resolve(relativePath);
+
+                if (Files.isDirectory(sourcePath))
+                {
+                    Files.createDirectories(targetPath);
+                }
+                else
+                {
+                    Files.createDirectories(targetPath.getParent());
+                    Files.copy(sourcePath, targetPath,
+                            StandardCopyOption.REPLACE_EXISTING,
+                            StandardCopyOption.COPY_ATTRIBUTES);
+                }
+            }
+            catch (IOException e)
+            {
+                throw new RuntimeException("Failed to copy: " + sourcePath, e);
+            }
+        });
+    }
+
+    private void deleteDirectory(Path directory) throws IOException
+    {
+        if (!Files.exists(directory)) {
+            return;
+        }
+
+        Files.walk(directory)
+                .sorted(java.util.Comparator.reverseOrder())
+                .forEach(path ->
+                {
+                    try {
+                        Files.delete(path);
+                    } catch (IOException e) {
+                        System.err.println("Failed to delete: " + path + " - " + e.getMessage());
+                    }
+                });
     }
 
     private void importJarFiles(List<File> files)
@@ -939,6 +1415,67 @@ public class ModManagerDialog extends JDialog
         buttonPanel.setOpaque(false);
         buttonPanel.setBorder(new EmptyBorder(15, 0, 0, 0));
 
+        JButton browserButton = createStyledButton("Open in Browser");
+        browserButton.setBackground(new Color(59, 130, 246, 180));
+        browserButton.setPreferredSize(new Dimension(150, 35));
+        browserButton.setToolTipText("Open mod page on CurseForge");
+        browserButton.addActionListener(e ->
+        {
+            String modUrl = String.format("https://www.curseforge.com/hytale/mods/%s", selected.slug);
+            try
+            {
+                if (Desktop.isDesktopSupported() && Desktop.getDesktop().isSupported(Desktop.Action.BROWSE))
+                {
+                    Desktop.getDesktop().browse(new java.net.URI(modUrl));
+                }
+                else
+                {
+                    String os = System.getProperty("os.name").toLowerCase();
+                    ProcessBuilder pb;
+
+                    if (os.contains("win")) {
+                        pb = new ProcessBuilder("rundll32", "url.dll,FileProtocolHandler", modUrl);
+                    } else if (os.contains("mac")) {
+                        pb = new ProcessBuilder("open", modUrl);
+                    } else if (os.contains("nix") || os.contains("nux")) {
+                        pb = new ProcessBuilder("xdg-open", modUrl);
+                    } else {
+                        throw new UnsupportedOperationException("Cannot open browser on this OS");
+                    }
+
+                    pb.start();
+                }
+
+                cfStatusLabel.setText("Opened mod page in browser");
+            } catch (Exception ex)
+            {
+                System.err.println("Failed to open browser: " + ex.getMessage());
+
+                try
+                {
+                    java.awt.datatransfer.StringSelection selection =
+                            new java.awt.datatransfer.StringSelection(modUrl);
+                    java.awt.Toolkit.getDefaultToolkit().getSystemClipboard()
+                            .setContents(selection, null);
+
+                    JOptionPane.showMessageDialog(
+                            detailsDialog,
+                            "Could not open browser.\nURL copied to clipboard:\n" + modUrl,
+                            "Browser Error",
+                            JOptionPane.WARNING_MESSAGE
+                    );
+                } catch (Exception clipEx)
+                {
+                    JOptionPane.showMessageDialog(
+                            detailsDialog,
+                            "Could not open browser.\nMod URL:\n" + modUrl,
+                            "Browser Error",
+                            JOptionPane.ERROR_MESSAGE
+                    );
+                }
+            }
+        });
+
         JButton installButton = createStyledButton("Install");
         installButton.setBackground(new Color(16, 185, 129, 180));
         installButton.addActionListener(e ->
@@ -951,6 +1488,7 @@ public class ModManagerDialog extends JDialog
         closeBtn.setBackground(new Color(60, 60, 70));
         closeBtn.addActionListener(e -> detailsDialog.dispose());
 
+        buttonPanel.add(browserButton);
         buttonPanel.add(installButton);
         buttonPanel.add(closeBtn);
 
@@ -1023,8 +1561,18 @@ public class ModManagerDialog extends JDialog
         controls.setOpaque(false);
 
         checkUpdatesButton = createHeaderButton("R");
-        checkUpdatesButton.setToolTipText("Check for updates");
-        checkUpdatesButton.addActionListener(e -> checkForUpdates());
+        checkUpdatesButton.setToolTipText("Check for updates / Refresh");
+        checkUpdatesButton.addActionListener(e ->
+        {
+            int selectedTab = tabbedPane.getSelectedIndex();
+
+            // 0 = Installed, 1 = CurseForge, 2 = Translations
+            if (selectedTab == 1) {
+                refreshCurseForgeResults();
+            } else if (selectedTab == 0) {
+                checkForUpdates();
+            }
+        });
 
         JButton openFolderButton = createHeaderButton("M");
         openFolderButton.setToolTipText("Open mods folder");
@@ -1055,6 +1603,26 @@ public class ModManagerDialog extends JDialog
         panel.add(controls, BorderLayout.EAST);
 
         return panel;
+    }
+
+    private void refreshCurseForgeResults()
+    {
+        if (isSearching) {
+            statusLabel.setText("Search already in progress...");
+            return;
+        }
+
+        String currentQuery = cfSearchField.getText().trim();
+
+        if (currentQuery.isEmpty())
+        {
+            hasLoadedPopularMods = false;
+            loadPopularMods();
+        }
+        else
+        {
+            performSearch();
+        }
     }
 
     private JButton createHeaderButton(String text)

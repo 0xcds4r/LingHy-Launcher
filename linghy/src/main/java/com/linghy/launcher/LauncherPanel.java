@@ -6,6 +6,7 @@ import com.linghy.java.JREDownloader;
 import com.linghy.model.GameSession;
 import com.linghy.model.ProgressCallback;
 import com.linghy.model.ProgressUpdate;
+import com.linghy.mods.ModManager;
 import com.linghy.mods.ModManagerDialog;
 import com.linghy.patches.OnlineFix;
 import com.linghy.patches.PatchManager;
@@ -1244,7 +1245,8 @@ public class LauncherPanel extends JPanel
         }
 
         ModManagerDialog dialog = new ModManagerDialog(
-                (Frame) SwingUtilities.getWindowAncestor(this)
+                (Frame) SwingUtilities.getWindowAncestor(this),
+                selectedVersion
         );
         dialog.setVisible(true);
     }

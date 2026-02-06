@@ -72,6 +72,16 @@ v1.7:
 - Added mod import support (by button or drag & drop)
 - Code optimize & bug fix
 
+v1.8:
+- Dropped a brand new tab: Translations in the mod manager - now you can slap Russian localization on your game
+- Completely reworked the online fix - it’s literally indistinguishable from the legit version now, we yeeted the old crap and route session login through our own custom auth-server
+- Added proper launcher settings window + notification toggles
+- Russians get a detailed troubleshooting bible now in case CurseForge decides to be a diva again
+- In mod manager -> CurseForge browser tab -> mod details you can now just yeet the mod straight into your browser with one click
+- Fixed some janky icon display bullshit on Windows
+- Mod manager tab refreshing finally stopped acting regarded and works properly
+- Code optimize & bug fix
+
 ### Screenshots:
 
 News & Control:
@@ -80,11 +90,11 @@ News & Control:
 
 Hytale Latest Release Versions:
 
-![02.png](preview/02.png)
+![02.png](https://raw.githubusercontent.com/0xcds4r/LingHy-Launcher/refs/heads/main/preview/02.png)
 
 Hytale Latest Pre-Release Versions:
 
-![03.png](preview/03.png)
+![03.png](https://raw.githubusercontent.com/0xcds4r/LingHy-Launcher/refs/heads/main/preview/03.png)
 
 Mod manager:
 
@@ -92,12 +102,12 @@ Mod manager:
 
 Curse Forge support:
 
-![05.png](preview/05.png)
+![05.png](https://raw.githubusercontent.com/0xcds4r/LingHy-Launcher/refs/heads/main/preview/05.png)
 
 Easy to play for free:
 
-![06.png](preview/06.png)
+![06.png](https://raw.githubusercontent.com/0xcds4r/LingHy-Launcher/refs/heads/main/preview/06.png)
 
-Auto online fix experimental support:
+Auto online fix support:
 
-![07.png](preview/07.png)
+![07.png](https://raw.githubusercontent.com/0xcds4r/LingHy-Launcher/refs/heads/main/preview/07.png)

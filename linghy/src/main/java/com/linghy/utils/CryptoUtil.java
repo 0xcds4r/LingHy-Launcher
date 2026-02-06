@@ -16,25 +16,8 @@ public final class CryptoUtil
 
     private static String loadPublicKey()
     {
-        Properties props = new Properties();
-
-        try (InputStream is = CryptoUtil.class.getClassLoader().getResourceAsStream("linghy.properties"))
-        {
-            if (is != null)
-            {
-                props.load(is);
-                String b64 = props.getProperty("public.key.b64", "").trim();
-                if (b64.isEmpty()) return "";
-
-                byte[] decoded = Base64.getDecoder().decode(b64);
-                return new String(decoded, StandardCharsets.UTF_8);
-            }
-        } catch (Exception e)
-        {
-            e.printStackTrace();
-        }
-
-        return "";
+        byte[] decoded = Base64.getDecoder().decode("MjNmMTcxYTEzOGMxYmEzOTJhMDY1ZTlhMmIyNTc0NjM=");
+        return new String(decoded, StandardCharsets.UTF_8);
     }
 
     private static SecretKey deriveKey(byte[] salt) throws Exception
