@@ -117,4 +117,4 @@ Auto online fix support:
 
 Translations support in ModManager (3rd tab):
 
-![08_p.png](https://raw.githubusercontent.com/0xcds4r/LingHy-Launcher/refs/heads/main/preview/08_p.png)
+![08.png](https://raw.githubusercontent.com/0xcds4r/LingHy-Launcher/refs/heads/main/preview/08.png)
