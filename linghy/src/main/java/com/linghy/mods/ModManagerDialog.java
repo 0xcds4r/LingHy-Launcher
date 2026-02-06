@@ -507,24 +507,25 @@ public class ModManagerDialog extends JDialog
     {
         Files.walk(source).forEach(sourcePath ->
         {
-            try
-            {
-                Path targetPath = target.resolve(source.relativize(sourcePath));
+            try {
+                Path relative = source.relativize(sourcePath);
+                String relativeStr = relative.toString();
 
-                if (Files.isDirectory(sourcePath))
-                {
-                    Files.createDirectories(targetPath);
+                if (relativeStr.startsWith("Client.backup.")) {
+                    return;
                 }
-                else
-                {
+
+                Path targetPath = target.resolve(relative);
+
+                if (Files.isDirectory(sourcePath)) {
+                    Files.createDirectories(targetPath);
+                } else {
                     Files.createDirectories(targetPath.getParent());
                     Files.copy(sourcePath, targetPath,
                             StandardCopyOption.REPLACE_EXISTING,
                             StandardCopyOption.COPY_ATTRIBUTES);
                 }
-            }
-            catch (IOException e)
-            {
+            } catch (IOException e) {
                 throw new RuntimeException("Failed to copy: " + sourcePath, e);
             }
         });
