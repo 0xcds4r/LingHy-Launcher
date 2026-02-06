@@ -82,6 +82,9 @@ v1.8:
 - Mod manager tab refreshing finally stopped acting regarded and works properly
 - Code optimize & bug fix
 
+hotfix v1.8.1: 
+- fixed infinite backup creation when installing packed resources
+
 ### Screenshots:
 
 News & Control:
