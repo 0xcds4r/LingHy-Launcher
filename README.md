@@ -114,3 +114,7 @@ Easy to play for free:
 Auto online fix support:
 
 ![07.png](https://raw.githubusercontent.com/0xcds4r/LingHy-Launcher/refs/heads/main/preview/07.png)
+
+Translations support in ModManager (3rd tab):
+
+![08.png](https://raw.githubusercontent.com/0xcds4r/LingHy-Launcher/refs/heads/main/preview/08.png)
